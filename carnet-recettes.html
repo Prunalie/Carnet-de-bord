@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carnet de Recettes 🍽️</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -132,6 +134,23 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 
 <script>
 // ═══════════════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyBQH37Rptdz4Pndb8JRcPFJKmlyymDqWLg",
+  authDomain: "carnet-de-bord-prunalie.firebaseapp.com",
+  projectId: "carnet-de-bord-prunalie",
+  storageBucket: "carnet-de-bord-prunalie.firebasestorage.app",
+  messagingSenderId: "627108360445",
+  appId: "1:627108360445:web:3b1738ee6089ec896f8e94"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+db.enablePersistence().catch(() => {});
+const DOC_REF = db.collection('carnet').doc('data');
+let _lastFirestoreData = null;
+
+// ═══════════════════════════════════════════════════════
 // DONNÉES INITIALES
 // ═══════════════════════════════════════════════════════
 const INITIAL_DATA = {
@@ -244,15 +263,97 @@ const INITIAL_DATA = {
      steps:['Préchauffer le four à 180°C. Foncer le moule.','Battre les œufs avec la crème, sel, poivre, herbes.','Disposer les légumes et le fromage sur la pâte, verser l\'appareil.','Cuire 30-35 min.'],notes:''},
   ],
   weeklyPlans: [],
-  checkedItems: {}
+  checkedItems: {},
+  shoppingHistory: [],
+  ingredientItems: [
+    {id:'ig1',name:'Carottes',cat:'legumes',needToBuy:false},
+    {id:'ig2',name:'Tomates',cat:'legumes',needToBuy:false},
+    {id:'ig3',name:'Courgettes',cat:'legumes',needToBuy:false},
+    {id:'ig4',name:'Poivrons',cat:'legumes',needToBuy:false},
+    {id:'ig5',name:'Oignons',cat:'legumes',needToBuy:false},
+    {id:'ig6',name:'Ail',cat:'legumes',needToBuy:false},
+    {id:'ig7',name:'Épinards',cat:'legumes',needToBuy:false},
+    {id:'ig8',name:'Salade verte',cat:'legumes',needToBuy:false},
+    {id:'ig9',name:'Pommes de terre',cat:'legumes',needToBuy:false},
+    {id:'ig10',name:'Champignons',cat:'legumes',needToBuy:false},
+    {id:'ig11',name:'Citrons',cat:'legumes',needToBuy:false},
+    {id:'ig12',name:'Avocats',cat:'legumes',needToBuy:false},
+    {id:'ig13',name:'Brocoli',cat:'legumes',needToBuy:false},
+    {id:'ig14',name:'Pommes',cat:'legumes',needToBuy:false},
+    {id:'ig15',name:'Bananes',cat:'legumes',needToBuy:false},
+    {id:'ig16',name:'Poulet',cat:'viandes',needToBuy:false},
+    {id:'ig17',name:'Bœuf haché',cat:'viandes',needToBuy:false},
+    {id:'ig18',name:'Saumon',cat:'viandes',needToBuy:false},
+    {id:'ig19',name:'Jambon blanc',cat:'viandes',needToBuy:false},
+    {id:'ig20',name:'Lardons',cat:'viandes',needToBuy:false},
+    {id:'ig21',name:'Thon en boîte',cat:'viandes',needToBuy:false},
+    {id:'ig22',name:'Crevettes',cat:'viandes',needToBuy:false},
+    {id:'ig23',name:'Lait',cat:'laitiers',needToBuy:false},
+    {id:'ig24',name:'Beurre',cat:'laitiers',needToBuy:false},
+    {id:'ig25',name:'Crème fraîche',cat:'laitiers',needToBuy:false},
+    {id:'ig26',name:'Fromage râpé',cat:'laitiers',needToBuy:false},
+    {id:'ig27',name:'Yaourts',cat:'laitiers',needToBuy:false},
+    {id:'ig28',name:'Œufs',cat:'laitiers',needToBuy:false},
+    {id:'ig29',name:'Pâtes',cat:'epicerie',needToBuy:false},
+    {id:'ig30',name:'Riz',cat:'epicerie',needToBuy:false},
+    {id:'ig31',name:'Pain',cat:'epicerie',needToBuy:false},
+    {id:'ig32',name:'Farine',cat:'epicerie',needToBuy:false},
+    {id:'ig33',name:'Sucre',cat:'epicerie',needToBuy:false},
+    {id:'ig34',name:'Huile d\'olive',cat:'epicerie',needToBuy:false},
+    {id:'ig35',name:'Café',cat:'epicerie',needToBuy:false},
+    {id:'ig36',name:'Tomates concassées',cat:'conserves',needToBuy:false},
+    {id:'ig37',name:'Pois chiches',cat:'conserves',needToBuy:false},
+    {id:'ig38',name:'Lentilles',cat:'conserves',needToBuy:false},
+    {id:'ig39',name:'Concentré de tomates',cat:'conserves',needToBuy:false},
+    {id:'ig40',name:'Bouillon de légumes',cat:'conserves',needToBuy:false},
+    {id:'ig41',name:'Moutarde',cat:'condiments',needToBuy:false},
+    {id:'ig42',name:'Sauce soja',cat:'condiments',needToBuy:false},
+    {id:'ig43',name:'Herbes de Provence',cat:'condiments',needToBuy:false},
+    {id:'ig44',name:'Vinaigre',cat:'condiments',needToBuy:false},
+    {id:'ig45',name:'Miel',cat:'condiments',needToBuy:false},
+  ],
+  maisonItems: [
+    {id:'h1',name:'Gel douche',cat:'salle-bain',needToBuy:false},
+    {id:'h2',name:'Shampoing',cat:'salle-bain',needToBuy:false},
+    {id:'h3',name:'Après-shampoing',cat:'salle-bain',needToBuy:false},
+    {id:'h4',name:'Dentifrice',cat:'salle-bain',needToBuy:false},
+    {id:'h5',name:'Brosse à dents',cat:'salle-bain',needToBuy:false},
+    {id:'h6',name:'Déodorant',cat:'salle-bain',needToBuy:false},
+    {id:'h7',name:'Rasoir / lames',cat:'salle-bain',needToBuy:false},
+    {id:'h8',name:'Coton-tiges',cat:'salle-bain',needToBuy:false},
+    {id:'h9',name:'Savon',cat:'salle-bain',needToBuy:false},
+    {id:'h10',name:'Crème hydratante',cat:'salle-bain',needToBuy:false},
+    {id:'h11',name:'Papier toilette',cat:'wc',needToBuy:false},
+    {id:'h12',name:'Produit WC',cat:'wc',needToBuy:false},
+    {id:'h13',name:'Liquide vaisselle',cat:'cuisine',needToBuy:false},
+    {id:'h14',name:'Éponges',cat:'cuisine',needToBuy:false},
+    {id:'h15',name:'Sacs poubelle',cat:'cuisine',needToBuy:false},
+    {id:'h16',name:'Essuie-tout',cat:'cuisine',needToBuy:false},
+    {id:'h17',name:'Film plastique',cat:'cuisine',needToBuy:false},
+    {id:'h18',name:'Papier aluminium',cat:'cuisine',needToBuy:false},
+    {id:'h19',name:'Lessive',cat:'entretien',needToBuy:false},
+    {id:'h20',name:'Adoucissant',cat:'entretien',needToBuy:false},
+    {id:'h21',name:'Produit sol',cat:'entretien',needToBuy:false},
+    {id:'h22',name:'Produit multi-surfaces',cat:'entretien',needToBuy:false},
+    {id:'h23',name:'Désodorisant',cat:'entretien',needToBuy:false},
+    {id:'h24',name:'Sacs aspirateur',cat:'entretien',needToBuy:false},
+  ]
 };
 
 // ═══════════════════════════════════════════════════════
 // ÉTAT & PERSISTANCE
 // ═══════════════════════════════════════════════════════
 let state = {};
-let fileHandle = null;
-let dirty = false;
+
+function ensureStateFields() {
+  if (!state.recipes || !state.recipes.length) state.recipes = JSON.parse(JSON.stringify(INITIAL_DATA.recipes));
+  if (!state.profiles) state.profiles = JSON.parse(JSON.stringify(INITIAL_DATA.profiles));
+  if (!state.weeklyPlans) state.weeklyPlans = [];
+  if (!state.checkedItems) state.checkedItems = {};
+  if (!state.maisonItems) state.maisonItems = JSON.parse(JSON.stringify(INITIAL_DATA.maisonItems));
+  if (!state.ingredientItems) state.ingredientItems = JSON.parse(JSON.stringify(INITIAL_DATA.ingredientItems));
+  if (!state.shoppingHistory) state.shoppingHistory = [];
+}
 
 function loadFromStorage() {
   try {
@@ -262,55 +363,46 @@ function loadFromStorage() {
   } catch { state = JSON.parse(JSON.stringify(INITIAL_DATA)); }
 }
 
+async function initFirestore() {
+  try {
+    const doc = await DOC_REF.get();
+    if (doc.exists) {
+      state = doc.data();
+      ensureStateFields();
+    } else {
+      await DOC_REF.set(state);
+    }
+    localStorage.setItem('carnet-recettes', JSON.stringify(state));
+    render();
+    setupRealtime();
+  } catch (e) {
+    console.warn('Firebase non disponible, mode hors ligne:', e);
+  }
+}
+
+function setupRealtime() {
+  DOC_REF.onSnapshot(doc => {
+    if (!doc.exists || doc.metadata.hasPendingWrites) return;
+    const dataStr = JSON.stringify(doc.data());
+    if (dataStr === _lastFirestoreData) return;
+    _lastFirestoreData = dataStr;
+    if (JSON.stringify(state) !== dataStr) {
+      state = doc.data();
+      ensureStateFields();
+      localStorage.setItem('carnet-recettes', JSON.stringify(state));
+      render();
+    }
+  });
+}
+
 async function save() {
   localStorage.setItem('carnet-recettes', JSON.stringify(state));
-  if (fileHandle) {
-    try {
-      const writable = await fileHandle.createWritable();
-      await writable.write(JSON.stringify(state, null, 2));
-      await writable.close();
-    } catch (e) { console.warn('Écriture fichier échouée:', e); }
-  }
-  dirty = false;
-}
-
-async function openFile() {
-  if (!('showOpenFilePicker' in window)) {
-    alert('Votre navigateur ne supporte pas l\'accès aux fichiers.\nUtilisez Chrome ou Edge pour la synchronisation OneDrive.'); return;
-  }
   try {
-    const [h] = await window.showOpenFilePicker({
-      types:[{description:'JSON',accept:{'application/json':['.json']}}],suggestedName:'carnet-recettes.json'
-    });
-    fileHandle = h;
-    const file = await h.getFile();
-    const text = await file.text();
-    const loaded = JSON.parse(text);
-    // Merge: garde les recettes initiales si absentes
-    state = loaded;
-    if (!state.recipes) state.recipes = [];
-    if (!state.profiles) state.profiles = JSON.parse(JSON.stringify(INITIAL_DATA.profiles));
-    if (!state.weeklyPlans) state.weeklyPlans = [];
-    if (!state.checkedItems) state.checkedItems = {};
-    await save();
-    alert('Fichier chargé ! Les modifications seront sauvegardées automatiquement dans ce fichier.');
-    render();
-  } catch (e) { if (e.name !== 'AbortError') alert('Erreur: ' + e.message); }
-}
-
-async function saveAsFile() {
-  if (!('showSaveFilePicker' in window)) {
-    exportData(); return;
+    _lastFirestoreData = JSON.stringify(state);
+    await DOC_REF.set(state);
+  } catch (e) {
+    console.warn('Erreur sauvegarde Firebase:', e);
   }
-  try {
-    const h = await window.showSaveFilePicker({
-      suggestedName:'carnet-recettes.json',
-      types:[{description:'JSON',accept:{'application/json':['.json']}}]
-    });
-    fileHandle = h;
-    await save();
-    alert('Fichier sauvegardé ! Placez ce fichier dans votre dossier OneDrive pour synchroniser entre appareils.');
-  } catch (e) { if (e.name !== 'AbortError') alert('Erreur: ' + e.message); }
 }
 
 function exportData() {
@@ -351,18 +443,16 @@ function toggleSync() {
   const btn = document.getElementById('sync-btn');
   const div = document.createElement('div');
   div.id = 'sync-menu';
-  div.style = 'position:fixed;top:52px;right:12px;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;padding:8px;min-width:250px';
-  const hasFilePicker = 'showOpenFilePicker' in window;
+  div.style = 'position:fixed;top:52px;right:12px;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;padding:8px;min-width:260px';
   const btnStyle = 'display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:none;cursor:pointer;font-size:.88rem;border-radius:6px';
   div.innerHTML = `
-    <div style="padding:8px 12px;font-size:.8rem;color:#7A917D;font-weight:600;border-bottom:1px solid #DDE8DF;margin-bottom:4px">SAUVEGARDE & SYNC</div>
-    <button onclick="exportData();document.getElementById('sync-menu')?.remove()" style="${btnStyle}" onmouseover="this.style.background='#EAF2EC'" onmouseout="this.style.background='none'">📤 Exporter (télécharger le fichier)</button>
-    <button onclick="document.getElementById('file-import-input').click();document.getElementById('sync-menu')?.remove()" style="${btnStyle}" onmouseover="this.style.background='#EAF2EC'" onmouseout="this.style.background='none'">📥 Importer un fichier JSON</button>
-    ${hasFilePicker ? `<div style="border-top:1px solid #DDE8DF;margin:4px 0"></div>
-    <button onclick="openFile();document.getElementById('sync-menu')?.remove()" style="${btnStyle}" onmouseover="this.style.background='#EAF2EC'" onmouseout="this.style.background='none'">🔗 Lier un fichier OneDrive (PC)</button>` : ''}
+    <div style="padding:8px 12px;font-size:.8rem;color:#7A917D;font-weight:600;border-bottom:1px solid #DDE8DF;margin-bottom:4px">☁️ SYNCHRONISATION</div>
+    <div style="padding:8px 14px;font-size:.82rem;color:#4A7C59;display:flex;align-items:center;gap:6px">✅ Synchronisé sur tous vos appareils</div>
+    <div style="border-top:1px solid #DDE8DF;margin:4px 0"></div>
+    <button onclick="exportData();document.getElementById('sync-menu')?.remove()" style="${btnStyle}" onmouseover="this.style.background='#EAF2EC'" onmouseout="this.style.background='none'">📤 Exporter une sauvegarde</button>
+    <button onclick="document.getElementById('file-import-input').click();document.getElementById('sync-menu')?.remove()" style="${btnStyle}" onmouseover="this.style.background='#EAF2EC'" onmouseout="this.style.background='none'">📥 Restaurer une sauvegarde</button>
     <div style="border-top:1px solid #DDE8DF;margin:4px 0"></div>
     <button onclick="if(confirm('⚠️ Remettre toutes les données par défaut ? Vos recettes ajoutées et votre planning seront perdus.')){state=JSON.parse(JSON.stringify(INITIAL_DATA));save();render();}document.getElementById('sync-menu')?.remove()" style="${btnStyle};color:#B91C1C" onmouseover="this.style.background='#FEE2E2'" onmouseout="this.style.background='none'">🗑️ Réinitialiser les données</button>
-    <div style="padding:8px 12px 4px;font-size:.75rem;color:#7A917D;line-height:1.4">💡 Exportez régulièrement pour sauvegarder. Partagez le fichier JSON via OneDrive/Google Drive pour synchroniser entre appareils.</div>
   `;
   document.body.appendChild(div);
   setTimeout(() => document.addEventListener('click', function h(e){if(!div.contains(e.target)&&e.target!==btn){div.remove();document.removeEventListener('click',h)}},0));
@@ -371,7 +461,7 @@ function toggleSync() {
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'}];
+const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'},{id:'ingredients',icon:'🥕',label:'Ingrédients'},{id:'maison',icon:'🏠',label:'Maison'}];
 let activeTab = 'recipes';
 let activeFilters = {mealType:null, season:null, tag:null, search:''};
 let weekOffset = 0; // 0 = semaine courante
@@ -399,6 +489,8 @@ const MEALS = [{k:'matin',label:'Matin'},{k:'midi',label:'Midi'},{k:'soir',label
 const SEASON_OPT = [{v:'printemps',l:'🌱 Printemps'},{v:'été',l:'☀️ Été'},{v:'automne',l:'🍂 Automne'},{v:'hiver',l:'❄️ Hiver'},{v:'toutes',l:'🗓️ Toutes saisons'}];
 const TAG_OPT = [{v:'végétarien',l:'🥦 Végétarien'},{v:'vegan',l:'🌿 Vegan'},{v:'four',l:'♨️ Four'},{v:'poêle',l:'🍳 Poêle'},{v:'casserole',l:'🥘 Casserole'},{v:'vapeur',l:'💨 Vapeur'},{v:'mijotage',l:'⏱️ Mijotage'},{v:'rapide',l:'⚡ Rapide'},{v:'sans cuisson',l:'🥗 Sans cuisson'}];
 const MEAL_OPT = [{v:'matin',l:'🌅 Matin'},{v:'midi',l:'☀️ Midi'},{v:'soir',l:'🌙 Soir'}];
+const MAISON_CATS = [{k:'salle-bain',l:'🛁 Salle de bain'},{k:'wc',l:'🚽 WC'},{k:'cuisine',l:'🍽️ Cuisine'},{k:'entretien',l:'🧹 Entretien'},{k:'autre',l:'📦 Autre'}];
+const INGREDIENT_CATS = [{k:'legumes',l:'🥦 Légumes & fruits'},{k:'viandes',l:'🥩 Viandes & poissons'},{k:'laitiers',l:'🥛 Produits laitiers'},{k:'epicerie',l:'🛒 Épicerie sèche'},{k:'conserves',l:'🥫 Conserves'},{k:'condiments',l:'🧄 Condiments & épices'},{k:'autre',l:'📦 Autre'}];
 function recipeById(id) { return state.recipes.find(r => r.id===id); }
 function getOrCreatePlan(weekKey) {
   let plan = state.weeklyPlans.find(p => p.weekStart===weekKey);
@@ -416,6 +508,8 @@ function render() {
   else if (activeTab==='recipes') main.innerHTML = renderRecipes();
   else if (activeTab==='planner') main.innerHTML = renderPlanner();
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
+  else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
+  else if (activeTab==='maison') main.innerHTML = renderMaison();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -481,17 +575,17 @@ function renderRecipes() {
   const filterBtn = (label, key, val) => `<button class="filter-btn ${f[key]===val?'on':''}" onclick="toggleFilter('${key}','${val}')">${label}</button>`;
   return `
   <div class="section-header">
-    <h2>🍽️ Recettes <span style="font-size:.85rem;color:var(--text-muted);font-weight:400">(${recipes.length}/${state.recipes.length})</span></h2>
+    <h2>🍽️ Recettes <span id="recipe-count" style="font-size:.85rem;color:var(--text-muted);font-weight:400">(${recipes.length}/${state.recipes.length})</span></h2>
     <button class="btn btn-primary" onclick="openRecipeForm()">+ Ajouter une recette</button>
   </div>
   <div class="filters">
-    <input class="search-box" type="text" placeholder="🔍 Rechercher…" value="${escHtml(f.search)}" oninput="activeFilters.search=this.value;renderMain()">
+    <input class="search-box" type="text" placeholder="🔍 Rechercher…" value="${escHtml(f.search)}" oninput="activeFilters.search=this.value;filterRecipeCards()" autocomplete="off" autocorrect="off" autocapitalize="off">
     ${filterBtn('🌅 Matin','mealType','matin')}${filterBtn('☀️ Midi','mealType','midi')}${filterBtn('🌙 Soir','mealType','soir')}
     ${filterBtn('🌱 Printemps','season','printemps')}${filterBtn('☀️ Été','season','été')}${filterBtn('🍂 Automne','season','automne')}${filterBtn('❄️ Hiver','season','hiver')}
     ${filterBtn('🥦 Végétarien','tag','végétarien')}${filterBtn('♨️ Four','tag','four')}${filterBtn('⚡ Rapide','tag','rapide')}
     ${f.mealType||f.season||f.tag||f.search?`<button class="filter-btn" onclick="clearFilters()" style="color:#B91C1C;border-color:#FECACA">✕ Effacer</button>`:''}
   </div>
-  ${recipes.length===0?'<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>':
+  <div id="recipe-cards-container">${recipes.length===0?'<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>':
     `<div class="card-grid">${recipes.map(r => `
     <div class="recipe-card" onclick="openRecipeDetail('${r.id}')">
       <div class="rc-name">${escHtml(r.name)}</div>
@@ -505,11 +599,49 @@ function renderRecipes() {
         <button class="btn btn-outline btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openRecipeForm('${r.id}')">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')" title="Supprimer">🗑</button>
       </div>
-    </div>`).join('')}</div>`}`;
+    </div>`).join('')}</div>`}</div>`;
+}
+function filterRecipeCards() {
+  const f = activeFilters;
+  const recipes = state.recipes.filter(r => {
+    if (f.mealType && !r.mealType.includes(f.mealType)) return false;
+    if (f.season && r.season && !r.season.includes(f.season) && !r.season.includes('toutes')) return false;
+    if (f.tag && !r.tags.includes(f.tag)) return false;
+    if (f.search && !r.name.toLowerCase().includes(f.search.toLowerCase())) return false;
+    return true;
+  });
+  const count = document.getElementById('recipe-count');
+  if (count) count.textContent = `(${recipes.length}/${state.recipes.length})`;
+  const container = document.getElementById('recipe-cards-container');
+  if (!container) { renderMain(); return; }
+  container.innerHTML = recipes.length===0
+    ? '<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>'
+    : `<div class="card-grid">${recipes.map(r=>`
+    <div class="recipe-card" onclick="openRecipeDetail('${r.id}')">
+      <div class="rc-name">${escHtml(r.name)}</div>
+      <div class="rc-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
+      <div class="tags">
+        ${r.mealType.map(m=>MEAL_OPT.find(x=>x.v===m)?.l||m).map(l=>`<span class="tag amber">${l}</span>`).join('')}
+        ${(r.season||[]).filter(s=>s!=='toutes').map(s=>`<span class="tag season">${s}</span>`).join('')}
+        ${r.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
+      </div>
+      <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+        <button class="btn btn-outline btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openRecipeForm('${r.id}')">✏️</button>
+        <button class="del-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')" title="Supprimer">🗑</button>
+      </div>
+    </div>`).join('')}</div>`;
 }
 function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?null:val; renderMain(); }
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
-function renderMain() { document.getElementById('main').innerHTML = activeTab==='recipes'?renderRecipes():activeTab==='profiles'?renderProfiles():activeTab==='planner'?renderPlanner():renderShopping(); }
+function renderMain() {
+  const m = document.getElementById('main');
+  if (activeTab==='recipes') m.innerHTML=renderRecipes();
+  else if (activeTab==='profiles') m.innerHTML=renderProfiles();
+  else if (activeTab==='planner') m.innerHTML=renderPlanner();
+  else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
+  else if (activeTab==='maison') m.innerHTML=renderMaison();
+  else m.innerHTML=renderShopping();
+}
 
 function deleteRecipe(id) {
   if (!confirm('Supprimer cette recette ?')) return;
@@ -704,6 +836,211 @@ function selectRecipe(recipeId) {
 function closePicker() { document.getElementById('picker-overlay').classList.remove('open'); }
 
 // ═══════════════════════════════════════════════════════
+// HISTORIQUE
+// ═══════════════════════════════════════════════════════
+function clearHistory() {
+  if (!confirm('Effacer tout l\'historique ?')) return;
+  state.shoppingHistory = [];
+  save();
+  renderMain();
+}
+
+function addToHistory(item, action, type) {
+  if (!state.shoppingHistory) state.shoppingHistory = [];
+  state.shoppingHistory.unshift({ts: Date.now(), item, action, type});
+  if (state.shoppingHistory.length > 300) state.shoppingHistory = state.shoppingHistory.slice(0, 300);
+}
+
+function renderHistorySection() {
+  const hist = state.shoppingHistory || [];
+  if (!hist.length) return '';
+  const fmtDate = ts => {
+    const d = new Date(ts), now = new Date();
+    const isToday = d.toDateString()===now.toDateString();
+    const isYest  = d.toDateString()===new Date(now-86400000).toDateString();
+    const day = isToday?'Aujourd\'hui':isYest?'Hier':d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+    return `${day} ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+  };
+  const typeLabel = t => t==='maison'?'🏠':t==='ingredient'?'🥕':'🍽️';
+  return `
+  <div style="margin-top:24px">
+    <details>
+      <summary style="cursor:pointer;font-weight:700;color:var(--text-muted);font-size:.95rem;padding:10px 0;list-style:none;display:flex;align-items:center;justify-content:space-between">
+        <span>📋 Historique des courses (${hist.length})</span><span style="font-size:.8rem">▼</span>
+      </summary>
+      <div class="card" style="margin-top:8px;padding:12px;max-height:320px;overflow-y:auto">
+        ${hist.slice(0,150).map(h=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--green-light);font-size:.82rem">
+          <span style="color:var(--text-muted);white-space:nowrap;min-width:130px">${fmtDate(h.ts)}</span>
+          <span>${typeLabel(h.type)}</span>
+          <span style="flex:1"><b>${escHtml(h.item)}</b> <span style="color:var(--text-muted)">${h.action==='bought'?'✅ acheté':'🛒 ajouté aux courses'}</span></span>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-sm" style="margin-top:8px;color:#B91C1C;border:1.5px solid #FECACA;background:#fff" onclick="clearHistory()">🗑️ Effacer l'historique</button>
+    </details>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// INGRÉDIENTS MANUELS
+// ═══════════════════════════════════════════════════════
+function renderIngredients() {
+  if (!state.ingredientItems) state.ingredientItems = [];
+  const toBuyCount = state.ingredientItems.filter(i=>i.needToBuy).length;
+  return `
+  <div class="section-header">
+    <h2>🥕 Ingrédients ${toBuyCount>0?`<span style="font-size:.8rem;background:var(--green);color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px">${toBuyCount} à acheter</span>`:''}</h2>
+    <button class="btn btn-primary" onclick="openAddIngredientItem()">+ Ajouter</button>
+  </div>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">Cochez les ingrédients à acheter — ils s'ajoutent automatiquement aux courses.</p>
+  ${INGREDIENT_CATS.map(cat=>{
+    const items = state.ingredientItems.filter(i=>i.cat===cat.k);
+    if (!items.length) return '';
+    return `<div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">${cat.l}</h3>
+      ${items.map(item=>`
+      <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:4px 6px;':''}">
+        <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleIngredientItem('${item.id}',this.checked)" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
+        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'};color:${item.needToBuy?'var(--green-dark)':'inherit'}" onclick="toggleIngredientItem('${item.id}',${!item.needToBuy})">
+          ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--green)">→ courses</span>':''}
+        </label>
+        <button class="del-btn" onclick="deleteIngredientItem('${item.id}')" title="Supprimer">🗑</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('')}`;
+}
+
+function toggleIngredientItem(id, val) {
+  const item = state.ingredientItems.find(i=>i.id===id);
+  if (!item) return;
+  item.needToBuy = val;
+  if (val) addToHistory(item.name, 'added', 'ingredient');
+  save(); renderMain();
+}
+
+function buyIngredientItem(id) {
+  const item = state.ingredientItems.find(i=>i.id===id);
+  if (!item) return;
+  addToHistory(item.name, 'bought', 'ingredient');
+  item.needToBuy = false;
+  save(); renderMain();
+}
+
+function deleteIngredientItem(id) {
+  if (!confirm('Supprimer cet ingrédient ?')) return;
+  state.ingredientItems = state.ingredientItems.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+
+function openAddIngredientItem() {
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Ajouter un ingrédient</h2>
+    <div class="form-group"><label>Nom</label>
+      <input type="text" id="new-ing-name" placeholder="Ex: Courgettes…">
+    </div>
+    <div class="form-group"><label>Catégorie</label>
+      <select id="new-ing-cat">
+        ${INGREDIENT_CATS.map(c=>`<option value="${c.k}">${c.l}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveIngredientItem()">Ajouter</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-ing-name')?.focus(),100);
+}
+
+function saveIngredientItem() {
+  const name = document.getElementById('new-ing-name').value.trim();
+  if (!name) { alert('Le nom est requis.'); return; }
+  const cat = document.getElementById('new-ing-cat').value;
+  state.ingredientItems.push({id:uid(), name, cat, needToBuy:false});
+  save(); closeModal(); renderMain();
+}
+
+// ═══════════════════════════════════════════════════════
+// MAISON
+// ═══════════════════════════════════════════════════════
+function renderMaison() {
+  if (!state.maisonItems) state.maisonItems = [];
+  const toBuyCount = state.maisonItems.filter(i=>i.needToBuy).length;
+  const bStyle = 'display:block;width:100%;text-align:left;padding:8px 0;border:none;background:none;cursor:pointer;font-size:.9rem;';
+  return `
+  <div class="section-header">
+    <h2>🏠 Maison ${toBuyCount>0?`<span style="font-size:.8rem;background:var(--amber);color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px">${toBuyCount} à acheter</span>`:''}</h2>
+    <button class="btn btn-primary" onclick="openAddMaisonItem()">+ Ajouter un produit</button>
+  </div>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">Cochez les produits à racheter — ils apparaîtront automatiquement dans la liste de courses.</p>
+  ${MAISON_CATS.map(cat => {
+    const items = state.maisonItems.filter(i=>i.cat===cat.k);
+    if (!items.length) return '';
+    return `<div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">${cat.l}</h3>
+      ${items.map(item=>`
+      <div class="shop-item" style="${item.needToBuy?'background:var(--amber-light);border-radius:6px;padding:4px 6px;':''}">
+        <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleMaisonItem('${item.id}',this.checked)" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'};color:${item.needToBuy?'#8a6520':'inherit'}" onclick="toggleMaisonItem('${item.id}',${!item.needToBuy})">
+          ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
+        </label>
+        <button class="del-btn" onclick="deleteMaisonItem('${item.id}')" title="Supprimer">🗑</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('')}`;
+}
+
+function toggleMaisonItem(id, val) {
+  const item = state.maisonItems.find(i=>i.id===id);
+  if (!item) return;
+  item.needToBuy = val;
+  if (val) addToHistory(item.name, 'added', 'maison');
+  save(); renderMain();
+}
+
+function buyMaisonItem(id) {
+  const item = state.maisonItems.find(i=>i.id===id);
+  if (!item) return;
+  addToHistory(item.name, 'bought', 'maison');
+  item.needToBuy = false;
+  save(); renderMain();
+}
+
+function deleteMaisonItem(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  state.maisonItems = state.maisonItems.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+
+function openAddMaisonItem() {
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Ajouter un produit</h2>
+    <div class="form-group"><label>Nom du produit</label>
+      <input type="text" id="new-maison-name" placeholder="Ex: Savon liquide…">
+    </div>
+    <div class="form-group"><label>Catégorie</label>
+      <select id="new-maison-cat">
+        ${MAISON_CATS.map(c=>`<option value="${c.k}">${c.l}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveMaisonItem()">Ajouter</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-maison-name')?.focus(),100);
+}
+
+function saveMaisonItem() {
+  const name = document.getElementById('new-maison-name').value.trim();
+  if (!name) { alert('Le nom est requis.'); return; }
+  const cat = document.getElementById('new-maison-cat').value;
+  state.maisonItems.push({id:uid(), name, cat, needToBuy:false});
+  save(); closeModal(); renderMain();
+}
+
+// ═══════════════════════════════════════════════════════
 // LISTE DE COURSES
 // ═══════════════════════════════════════════════════════
 function renderShopping() {
@@ -729,15 +1066,41 @@ function renderShopping() {
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey] = {};
   const checked = state.checkedItems[checkedKey];
   const we = new Date(ws); we.setDate(we.getDate()+6);
+  const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
+  const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy);
+  const weekNav = `<div class="week-nav">
+    <button onclick="weekOffset--;render()">◀</button>
+    <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
+    <button onclick="weekOffset++;render()">▶</button>
+    <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Aujourd'hui</button>
+  </div>`;
+  const maisonSection = maisonToBuy.length>0 ? `
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🏠 Produits maison</h3>
+      ${maisonToBuy.map(item=>`
+      <div class="shop-item">
+        <input type="checkbox" onchange="buyMaisonItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
+      </div>`).join('')}
+    </div>` : '';
+  const ingSection = ingToBuy.length>0 ? `
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">🥕 Ingrédients</h3>
+      ${ingToBuy.map(item=>`
+      <div class="shop-item">
+        <input type="checkbox" onchange="buyIngredientItem('${item.id}')" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
+        <label style="cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
+      </div>`).join('')}
+    </div>` : '';
+
   if (items.length===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
-    <div class="week-nav">
-      <button onclick="weekOffset--;render()">◀</button>
-      <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
-      <button onclick="weekOffset++;render()">▶</button>
-      <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Aujourd'hui</button>
-    </div>
-    <div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée pour cette semaine.</p><p style="margin-top:8px">Ajoutez des recettes dans l'onglet <b>Planning</b>.</p></div>`;
+    ${weekNav}
+    ${ingSection}
+    ${maisonSection}
+    ${maisonToBuy.length===0&&ingToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
+    ${renderHistorySection()}
+  `;
   const doneCount = items.filter(it=>checked[it.name.toLowerCase().trim()]).length;
   return `
   <div class="section-header">
@@ -748,6 +1111,8 @@ function renderShopping() {
       <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
     </div>
   </div>
+  ${ingSection}
+  ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between">
     <span style="font-size:.88rem"><b>${recipeIds.size}</b> recettes · <b>${items.length}</b> ingrédients · <b>${doneCount}</b> cochés</span>
     <span style="font-size:.82rem;color:var(--text-muted)">${recipeIds.size>0?[...recipeIds].map(id=>recipeById(id)?.name).filter(Boolean).join(' · '):''}</span>
@@ -762,11 +1127,12 @@ function renderShopping() {
       <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b> <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span></label>
     </div>`;
   }).join('')}
-  </div>`;
+  </div>
+  ${renderHistorySection()}`;
 }
 function toggleCheck(checkedKey, key, val) {
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey]={};
-  if (val) state.checkedItems[checkedKey][key]=true;
+  if (val) { state.checkedItems[checkedKey][key]=true; addToHistory(key, 'bought', 'recette'); }
   else delete state.checkedItems[checkedKey][key];
   save();
   const item = document.querySelector(`.shop-item input[onchange*="${key}"]`)?.closest('.shop-item');
@@ -793,8 +1159,9 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeModal();close
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
-loadFromStorage();
+loadFromStorage(); // Affichage immédiat depuis le cache local
 render();
+initFirestore();  // Puis synchronisation avec Firebase
 </script>
 </body>
 </html>
