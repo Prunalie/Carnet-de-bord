@@ -263,7 +263,33 @@ const INITIAL_DATA = {
      steps:['Préchauffer le four à 180°C. Foncer le moule.','Battre les œufs avec la crème, sel, poivre, herbes.','Disposer les légumes et le fromage sur la pâte, verser l\'appareil.','Cuire 30-35 min.'],notes:''},
   ],
   weeklyPlans: [],
-  checkedItems: {}
+  checkedItems: {},
+  maisonItems: [
+    {id:'h1',name:'Gel douche',cat:'salle-bain',needToBuy:false},
+    {id:'h2',name:'Shampoing',cat:'salle-bain',needToBuy:false},
+    {id:'h3',name:'Après-shampoing',cat:'salle-bain',needToBuy:false},
+    {id:'h4',name:'Dentifrice',cat:'salle-bain',needToBuy:false},
+    {id:'h5',name:'Brosse à dents',cat:'salle-bain',needToBuy:false},
+    {id:'h6',name:'Déodorant',cat:'salle-bain',needToBuy:false},
+    {id:'h7',name:'Rasoir / lames',cat:'salle-bain',needToBuy:false},
+    {id:'h8',name:'Coton-tiges',cat:'salle-bain',needToBuy:false},
+    {id:'h9',name:'Savon',cat:'salle-bain',needToBuy:false},
+    {id:'h10',name:'Crème hydratante',cat:'salle-bain',needToBuy:false},
+    {id:'h11',name:'Papier toilette',cat:'wc',needToBuy:false},
+    {id:'h12',name:'Produit WC',cat:'wc',needToBuy:false},
+    {id:'h13',name:'Liquide vaisselle',cat:'cuisine',needToBuy:false},
+    {id:'h14',name:'Éponges',cat:'cuisine',needToBuy:false},
+    {id:'h15',name:'Sacs poubelle',cat:'cuisine',needToBuy:false},
+    {id:'h16',name:'Essuie-tout',cat:'cuisine',needToBuy:false},
+    {id:'h17',name:'Film plastique',cat:'cuisine',needToBuy:false},
+    {id:'h18',name:'Papier aluminium',cat:'cuisine',needToBuy:false},
+    {id:'h19',name:'Lessive',cat:'entretien',needToBuy:false},
+    {id:'h20',name:'Adoucissant',cat:'entretien',needToBuy:false},
+    {id:'h21',name:'Produit sol',cat:'entretien',needToBuy:false},
+    {id:'h22',name:'Produit multi-surfaces',cat:'entretien',needToBuy:false},
+    {id:'h23',name:'Désodorisant',cat:'entretien',needToBuy:false},
+    {id:'h24',name:'Sacs aspirateur',cat:'entretien',needToBuy:false},
+  ]
 };
 
 // ═══════════════════════════════════════════════════════
@@ -276,6 +302,7 @@ function ensureStateFields() {
   if (!state.profiles) state.profiles = JSON.parse(JSON.stringify(INITIAL_DATA.profiles));
   if (!state.weeklyPlans) state.weeklyPlans = [];
   if (!state.checkedItems) state.checkedItems = {};
+  if (!state.maisonItems) state.maisonItems = JSON.parse(JSON.stringify(INITIAL_DATA.maisonItems));
 }
 
 function loadFromStorage() {
@@ -384,7 +411,7 @@ function toggleSync() {
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'}];
+const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'},{id:'maison',icon:'🏠',label:'Maison'}];
 let activeTab = 'recipes';
 let activeFilters = {mealType:null, season:null, tag:null, search:''};
 let weekOffset = 0; // 0 = semaine courante
@@ -412,6 +439,7 @@ const MEALS = [{k:'matin',label:'Matin'},{k:'midi',label:'Midi'},{k:'soir',label
 const SEASON_OPT = [{v:'printemps',l:'🌱 Printemps'},{v:'été',l:'☀️ Été'},{v:'automne',l:'🍂 Automne'},{v:'hiver',l:'❄️ Hiver'},{v:'toutes',l:'🗓️ Toutes saisons'}];
 const TAG_OPT = [{v:'végétarien',l:'🥦 Végétarien'},{v:'vegan',l:'🌿 Vegan'},{v:'four',l:'♨️ Four'},{v:'poêle',l:'🍳 Poêle'},{v:'casserole',l:'🥘 Casserole'},{v:'vapeur',l:'💨 Vapeur'},{v:'mijotage',l:'⏱️ Mijotage'},{v:'rapide',l:'⚡ Rapide'},{v:'sans cuisson',l:'🥗 Sans cuisson'}];
 const MEAL_OPT = [{v:'matin',l:'🌅 Matin'},{v:'midi',l:'☀️ Midi'},{v:'soir',l:'🌙 Soir'}];
+const MAISON_CATS = [{k:'salle-bain',l:'🛁 Salle de bain'},{k:'wc',l:'🚽 WC'},{k:'cuisine',l:'🍽️ Cuisine'},{k:'entretien',l:'🧹 Entretien'},{k:'autre',l:'📦 Autre'}];
 function recipeById(id) { return state.recipes.find(r => r.id===id); }
 function getOrCreatePlan(weekKey) {
   let plan = state.weeklyPlans.find(p => p.weekStart===weekKey);
@@ -429,6 +457,7 @@ function render() {
   else if (activeTab==='recipes') main.innerHTML = renderRecipes();
   else if (activeTab==='planner') main.innerHTML = renderPlanner();
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
+  else if (activeTab==='maison') main.innerHTML = renderMaison();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -522,7 +551,14 @@ function renderRecipes() {
 }
 function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?null:val; renderMain(); }
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
-function renderMain() { document.getElementById('main').innerHTML = activeTab==='recipes'?renderRecipes():activeTab==='profiles'?renderProfiles():activeTab==='planner'?renderPlanner():renderShopping(); }
+function renderMain() {
+  const m = document.getElementById('main');
+  if (activeTab==='recipes') m.innerHTML=renderRecipes();
+  else if (activeTab==='profiles') m.innerHTML=renderProfiles();
+  else if (activeTab==='planner') m.innerHTML=renderPlanner();
+  else if (activeTab==='maison') m.innerHTML=renderMaison();
+  else m.innerHTML=renderShopping();
+}
 
 function deleteRecipe(id) {
   if (!confirm('Supprimer cette recette ?')) return;
@@ -717,6 +753,80 @@ function selectRecipe(recipeId) {
 function closePicker() { document.getElementById('picker-overlay').classList.remove('open'); }
 
 // ═══════════════════════════════════════════════════════
+// MAISON
+// ═══════════════════════════════════════════════════════
+function renderMaison() {
+  if (!state.maisonItems) state.maisonItems = [];
+  const toBuyCount = state.maisonItems.filter(i=>i.needToBuy).length;
+  const bStyle = 'display:block;width:100%;text-align:left;padding:8px 0;border:none;background:none;cursor:pointer;font-size:.9rem;';
+  return `
+  <div class="section-header">
+    <h2>🏠 Maison ${toBuyCount>0?`<span style="font-size:.8rem;background:var(--amber);color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px">${toBuyCount} à acheter</span>`:''}</h2>
+    <button class="btn btn-primary" onclick="openAddMaisonItem()">+ Ajouter un produit</button>
+  </div>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">Cochez les produits à racheter — ils apparaîtront automatiquement dans la liste de courses.</p>
+  ${MAISON_CATS.map(cat => {
+    const items = state.maisonItems.filter(i=>i.cat===cat.k);
+    if (!items.length) return '';
+    return `<div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">${cat.l}</h3>
+      ${items.map(item=>`
+      <div class="shop-item" style="${item.needToBuy?'background:var(--amber-light);border-radius:6px;padding:4px 6px;':''}">
+        <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleMaisonItem('${item.id}',this.checked)" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'};color:${item.needToBuy?'#8a6520':'inherit'}" onclick="toggleMaisonItem('${item.id}',${!item.needToBuy})">
+          ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
+        </label>
+        <button class="del-btn" onclick="deleteMaisonItem('${item.id}')" title="Supprimer">🗑</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('')}`;
+}
+
+function toggleMaisonItem(id, val) {
+  const item = state.maisonItems.find(i=>i.id===id);
+  if (item) { item.needToBuy = val; save(); renderMain(); }
+}
+
+function buyMaisonItem(id) {
+  const item = state.maisonItems.find(i=>i.id===id);
+  if (item) { item.needToBuy = false; save(); renderMain(); }
+}
+
+function deleteMaisonItem(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  state.maisonItems = state.maisonItems.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+
+function openAddMaisonItem() {
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Ajouter un produit</h2>
+    <div class="form-group"><label>Nom du produit</label>
+      <input type="text" id="new-maison-name" placeholder="Ex: Savon liquide…">
+    </div>
+    <div class="form-group"><label>Catégorie</label>
+      <select id="new-maison-cat">
+        ${MAISON_CATS.map(c=>`<option value="${c.k}">${c.l}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveMaisonItem()">Ajouter</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-maison-name')?.focus(),100);
+}
+
+function saveMaisonItem() {
+  const name = document.getElementById('new-maison-name').value.trim();
+  if (!name) { alert('Le nom est requis.'); return; }
+  const cat = document.getElementById('new-maison-cat').value;
+  state.maisonItems.push({id:uid(), name, cat, needToBuy:false});
+  save(); closeModal(); renderMain();
+}
+
+// ═══════════════════════════════════════════════════════
 // LISTE DE COURSES
 // ═══════════════════════════════════════════════════════
 function renderShopping() {
@@ -742,15 +852,29 @@ function renderShopping() {
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey] = {};
   const checked = state.checkedItems[checkedKey];
   const we = new Date(ws); we.setDate(we.getDate()+6);
+  const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
+  const weekNav = `<div class="week-nav">
+    <button onclick="weekOffset--;render()">◀</button>
+    <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
+    <button onclick="weekOffset++;render()">▶</button>
+    <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Aujourd'hui</button>
+  </div>`;
+  const maisonSection = maisonToBuy.length>0 ? `
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🏠 Produits maison</h3>
+      ${maisonToBuy.map(item=>`
+      <div class="shop-item">
+        <input type="checkbox" onchange="buyMaisonItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
+      </div>`).join('')}
+    </div>` : '';
+
   if (items.length===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
-    <div class="week-nav">
-      <button onclick="weekOffset--;render()">◀</button>
-      <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
-      <button onclick="weekOffset++;render()">▶</button>
-      <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Aujourd'hui</button>
-    </div>
-    <div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée pour cette semaine.</p><p style="margin-top:8px">Ajoutez des recettes dans l'onglet <b>Planning</b>.</p></div>`;
+    ${weekNav}
+    ${maisonSection}
+    ${maisonToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée pour cette semaine.</p><p style="margin-top:8px">Ajoutez des recettes dans l'onglet <b>Planning</b>.</p></div>`:''}
+  `;
   const doneCount = items.filter(it=>checked[it.name.toLowerCase().trim()]).length;
   return `
   <div class="section-header">
@@ -761,6 +885,7 @@ function renderShopping() {
       <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
     </div>
   </div>
+  ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between">
     <span style="font-size:.88rem"><b>${recipeIds.size}</b> recettes · <b>${items.length}</b> ingrédients · <b>${doneCount}</b> cochés</span>
     <span style="font-size:.82rem;color:var(--text-muted)">${recipeIds.size>0?[...recipeIds].map(id=>recipeById(id)?.name).filter(Boolean).join(' · '):''}</span>
