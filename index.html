@@ -435,6 +435,8 @@ function ensureStateFields() {
       if (!seen.has(key)) { seen.add(key); state.masterIngredients.push({id:i.id,name:i.name,type:'shopping',cat:i.cat,needToBuy:i.needToBuy||false}); }
     });
   }
+  // S'assurer que chaque ingrédient a un rayon
+  state.masterIngredients.forEach(i => { if (!i.cat) i.cat = 'autre'; });
   if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.shoppingHistory) state.shoppingHistory = [];
 }
@@ -1118,8 +1120,14 @@ function setIngTab(t) { _ingTab = t; renderMain(); }
 
 function filterIngredients(q) {
   const v = q.toLowerCase().trim();
-  document.querySelectorAll('#ing-items-list .ing-item').forEach(el => {
-    el.style.display = el.dataset.name.includes(v) ? '' : 'none';
+  document.querySelectorAll('#ing-items-list .ing-cat-group').forEach(group => {
+    let any = false;
+    group.querySelectorAll('.ing-item').forEach(el => {
+      const show = el.dataset.name.includes(v);
+      el.style.display = show ? '' : 'none';
+      if (show) any = true;
+    });
+    group.style.display = any ? '' : 'none';
   });
 }
 
@@ -1134,9 +1142,29 @@ function renderIngredients() {
   const accent = isPantry ? 'var(--amber)' : 'var(--green)';
   const accentLight = isPantry ? 'var(--amber-light)' : 'var(--green-light)';
 
-  const tabBadge = (n, color) => n > 0
-    ? `<span style="background:${color};color:#fff;border-radius:10px;padding:1px 7px;margin-left:5px;font-size:.72rem">${n} à ${isPantry?'racheter':'acheter'}</span>`
-    : '';
+  // Grouper par rayon
+  const grouped = {};
+  INGREDIENT_CATS.forEach(c => { grouped[c.k] = []; });
+  items.forEach(item => { (grouped[item.cat||'autre'] || grouped['autre']).push(item); });
+
+  const renderItem = item => {
+    const marked = item.needToBuy;
+    return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${marked?`border-color:${accent};background:${accentLight};`:''}">
+      <input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
+      <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>
+      <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.73rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">${isPantry?'→ Ponct.':'→ Placard'}</button>
+      <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')">🗑</button>
+    </div>`;
+  };
+
+  const groupsHTML = INGREDIENT_CATS.map(cat => {
+    const catItems = grouped[cat.k];
+    if (!catItems.length) return '';
+    return `<div class="ing-cat-group">
+      <div style="font-weight:700;font-size:.8rem;color:var(--text-muted);letter-spacing:.04em;padding:6px 0 5px;border-bottom:1.5px solid var(--border);margin-bottom:6px">${cat.l}</div>
+      ${catItems.map(renderItem).join('')}
+    </div>`;
+  }).join('');
 
   return `
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -1144,43 +1172,21 @@ function renderIngredients() {
     <button class="btn btn-sm btn-primary" onclick="openAddMasterIngredient('${_ingTab}')">+ Ajouter</button>
   </div>
 
-  <!-- Sous-onglets -->
   <div class="seg-tabs">
     <button class="seg-tab ${isPantry?'active':''}" onclick="setIngTab('pantry')">
-      🫙 Placard
-      <span style="font-weight:400;font-size:.78rem;color:${isPantry?'var(--text-muted)':'var(--text-muted)'}"> (${pantry.length})</span>
+      🫙 Placard <span style="font-weight:400;font-size:.78rem"> (${pantry.length})</span>
       ${pantryToBuy?`<span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${pantryToBuy}</span>`:''}
     </button>
     <button class="seg-tab ${!isPantry?'active':''}" onclick="setIngTab('shopping')">
-      🛒 Ponctuels
-      <span style="font-weight:400;font-size:.78rem;color:var(--text-muted)"> (${shopping.length})</span>
+      🛒 Ponctuels <span style="font-weight:400;font-size:.78rem"> (${shopping.length})</span>
       ${ingToBuy?`<span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${ingToBuy}</span>`:''}
     </button>
   </div>
 
-  <!-- Recherche -->
-  <input type="search" class="search-box" placeholder="🔍 Rechercher…" oninput="filterIngredients(this.value)" style="width:100%;margin-bottom:12px" autocomplete="off" autocorrect="off">
+  <input type="search" class="search-box" placeholder="🔍 Rechercher…" oninput="filterIngredients(this.value)" style="width:100%;margin-bottom:14px" autocomplete="off" autocorrect="off">
 
-  <!-- Description -->
-  <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">
-    ${isPantry
-      ? 'Ingrédients toujours en stock. Cochez ceux à racheter → ils apparaissent dans les courses. Le placard filtre automatiquement les recettes planifiées.'
-      : 'Ingrédients à acheter ponctuellement. Cochez pour les ajouter à la liste de courses.'}
-  </p>
-
-  <!-- Liste -->
   ${items.length === 0 ? `<div class="empty-state"><p>Aucun ingrédient ici.<br>Cliquez sur <b>+ Ajouter</b> pour commencer.</p></div>` : ''}
-  <div id="ing-items-list">
-    ${items.map(item => {
-      const marked = item.needToBuy;
-      return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${marked?`border-color:${accent};background:${accentLight};`:''}">
-        <input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
-        <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>
-        <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.73rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">${isPantry?'→ Ponct.':'→ Placard'}</button>
-        <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')">🗑</button>
-      </div>`;
-    }).join('')}
-  </div>`;
+  <div id="ing-items-list">${groupsHTML}</div>`;
 }
 
 function toggleMasterIngredient(id, val) {
@@ -1218,7 +1224,7 @@ function changeMasterIngType(id) {
   save(); renderMain();
 }
 
-function openAddMasterIngredient(defaultType) {
+function openAddMasterIngredient(defaultType, defaultCat) {
   const existing = (state.masterIngredients||[]).map(i=>i.name).sort((a,b)=>a.localeCompare(b,'fr'));
   const datalistOpts = existing.map(n=>`<option value="${escHtml(n)}">`).join('');
   document.getElementById('modal-content').innerHTML = `
@@ -1228,6 +1234,11 @@ function openAddMasterIngredient(defaultType) {
     <datalist id="mi-datalist">${datalistOpts}</datalist>
     <div class="form-group"><label>Nom de l'ingrédient</label>
       <input type="text" id="new-mi-name" list="mi-datalist" placeholder="Ex: Curcuma, Carottes…" autocomplete="off">
+    </div>
+    <div class="form-group"><label>Rayon</label>
+      <select id="new-mi-cat">
+        ${INGREDIENT_CATS.map(c=>`<option value="${c.k}" ${(defaultCat||'autre')===c.k?'selected':''}>${c.l}</option>`).join('')}
+      </select>
     </div>
     <div class="form-group"><label>Type</label>
       <select id="new-mi-type">
@@ -1249,7 +1260,10 @@ function openAddMasterIngredient(defaultType) {
     const warn = document.getElementById('mi-warn');
     if (found) {
       warn.style.display='block';
-      warn.textContent = `"${found.name}" existe déjà (${found.type==='pantry'?'Placard':'Ponctuel'}). Enregistrer changera son type si nécessaire.`;
+      const catLabel = INGREDIENT_CATS.find(c=>c.k===found.cat)?.l || found.cat;
+      warn.textContent = `"${found.name}" existe déjà (${found.type==='pantry'?'Placard':'Ponctuel'} · ${catLabel}). Enregistrer mettra à jour rayon et type.`;
+      document.getElementById('new-mi-cat').value = found.cat || 'autre';
+      document.getElementById('new-mi-type').value = found.type;
     } else { warn.style.display='none'; }
   });
 }
@@ -1258,12 +1272,14 @@ function saveMasterIngredient() {
   const name = document.getElementById('new-mi-name').value.trim();
   if (!name) { alert('Le nom est requis.'); return; }
   const type = document.getElementById('new-mi-type').value;
+  const cat  = document.getElementById('new-mi-cat').value;
   if (!state.masterIngredients) state.masterIngredients = [];
   const existing = state.masterIngredients.find(i=>i.name.toLowerCase()===name.toLowerCase());
   if (existing) {
     existing.type = type;
+    existing.cat  = cat;
   } else {
-    state.masterIngredients.push({id:uid(), name, type, needToBuy: type==='shopping'});
+    state.masterIngredients.push({id:uid(), name, type, cat, needToBuy: type==='shopping'});
   }
   save(); closeModal(); renderMain();
 }
@@ -1354,22 +1370,11 @@ function saveMaisonItem() {
 function renderShopping() {
   const ws = getWeekStart(weekOffset);
   const weekKey = ws.toISOString().slice(0,10);
+  const we = new Date(ws); we.setDate(we.getDate()+6);
   const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
-  // Collecter tous les IDs de recettes de la semaine
   const recipeIds = new Set();
   if (plan) Object.values(plan.days).forEach(day => Object.values(day).forEach(id=>recipeIds.add(id)));
-  // Agréger les ingrédients (hors placard non demandé)
-  const all = {};
-  recipeIds.forEach(id => {
-    const r = recipeById(id); if (!r) return;
-    r.ingredients.forEach(ing => {
-      const norm = normIngName(ing.n);
-      const pantry = (state.masterIngredients||[]).find(p => p.type==='pantry' && normIngName(p.name)===norm);
-      if (pantry && !pantry.needToBuy) return; // dans le placard, pas besoin
-      if (!all[norm]) all[norm] = {name:ing.n, entries:[], isPantry:!!pantry};
-      all[norm].entries.push({q:ing.q, u:ing.u, recipe:r.name});
-    });
-  });
+
   const checkedKey = `checked-${weekKey}`;
   if (!state.checkedItems) state.checkedItems = {};
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey] = {};
@@ -1377,85 +1382,119 @@ function renderShopping() {
   if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.dismissedItems[checkedKey]) state.dismissedItems[checkedKey] = {};
   const dismissed = state.dismissedItems[checkedKey];
-  const items = Object.values(all).filter(it=>!dismissed[it.name.toLowerCase().trim()]).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
-  const we = new Date(ws); we.setDate(we.getDate()+6);
+
+  // ── Construction de la liste unifiée ──────────────────
+  // normKey → {name, cat, type:'recipe'|'pantry'|'shopping', masterId, entries[]}
+  const allMap = {};
+
+  // 1. Ingrédients des recettes planifiées
+  recipeIds.forEach(id => {
+    const r = recipeById(id); if (!r) return;
+    r.ingredients.forEach(ing => {
+      const norm = normIngName(ing.n);
+      const master = (state.masterIngredients||[]).find(p => normIngName(p.name)===norm);
+      if (master?.type==='pantry' && !master.needToBuy) return;
+      if (!allMap[norm]) allMap[norm] = {name:ing.n, cat:master?.cat||'autre', type:'recipe', masterId:master?.id, entries:[]};
+      allMap[norm].entries.push({q:ing.q, u:ing.u});
+    });
+  });
+
+  // 2. Placard à racheter (fusion si déjà dans les recettes)
+  (state.masterIngredients||[]).filter(i=>i.type==='pantry'&&i.needToBuy).forEach(item => {
+    const norm = normIngName(item.name);
+    if (allMap[norm]) { allMap[norm].masterId = item.id; }
+    else allMap[norm] = {name:item.name, cat:item.cat||'autre', type:'pantry', masterId:item.id, entries:[]};
+  });
+
+  // 3. Ingrédients ponctuels cochés
+  (state.masterIngredients||[]).filter(i=>i.type==='shopping'&&i.needToBuy).forEach(item => {
+    const norm = normIngName(item.name);
+    if (!allMap[norm]) allMap[norm] = {name:item.name, cat:item.cat||'autre', type:'shopping', masterId:item.id, entries:[]};
+  });
+
+  // Filtrer les éléments masqués
+  const allItems = Object.values(allMap).filter(it => !dismissed[it.name.toLowerCase().trim()]);
+
+  // ── Groupement par rayon ──────────────────────────────
+  const byRayon = {};
+  INGREDIENT_CATS.forEach(c => byRayon[c.k] = []);
+  allItems.forEach(it => (byRayon[it.cat]||byRayon['autre']).push(it));
+  INGREDIENT_CATS.forEach(c => byRayon[c.k].sort((a,b)=>a.name.localeCompare(b.name,'fr')));
+
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
-  const ingToBuy = (state.masterIngredients||[]).filter(i=>i.type==='shopping'&&i.needToBuy);
-  const pantryToBuy = (state.masterIngredients||[]).filter(i=>i.type==='pantry'&&i.needToBuy);
+  const totalItems = allItems.length;
+  const doneCount = allItems.filter(it => it.type==='recipe' && !!checked[it.name.toLowerCase().trim()]).length;
+
   const weekNav = `<div class="week-nav">
     <button onclick="weekOffset--;render()">◀</button>
     <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
     <button onclick="weekOffset++;render()">▶</button>
     <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Aujourd'hui</button>
   </div>`;
+
+  // ── Rendu d'un article ─────────────────────────────────
+  const renderShopItem = it => {
+    const key = it.name.toLowerCase().trim();
+    if (it.type === 'recipe') {
+      const isChecked = !!checked[key];
+      const summary = it.entries.length ? sumQty(it.entries) : '';
+      return `<div class="shop-item${isChecked?' checked':''}">
+        <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
+        <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}
+        </label>
+        <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${key}')" title="Retirer sans historique">🗑</button>
+      </div>`;
+    }
+    const isPantry = it.type==='pantry';
+    return `<div class="shop-item">
+      <input type="checkbox" onchange="buyMasterIngredient('${it.masterId}')" style="accent-color:${isPantry?'var(--amber)':'var(--green)'};width:16px;height:16px;cursor:pointer">
+      <label style="flex:1;cursor:pointer" onclick="buyMasterIngredient('${it.masterId}')">${escHtml(it.name)} <span style="font-size:.7rem;color:var(--text-muted)">${isPantry?'🫙 placard':'🛒'}</span></label>
+      <button class="del-btn" onclick="toggleMasterIngredient('${it.masterId}',false)" title="Retirer de la liste">🗑</button>
+    </div>`;
+  };
+
+  // ── Section Maison ─────────────────────────────────────
   const maisonSection = maisonToBuy.length>0 ? `
     <div class="card" style="margin-bottom:12px">
-      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🏠 Produits maison</h3>
+      <div style="font-weight:700;font-size:.83rem;color:var(--green-dark);padding:6px 0 5px;border-bottom:2px solid var(--amber-light);margin-bottom:4px">🏠 Produits maison</div>
       ${maisonToBuy.map(item=>`
       <div class="shop-item">
         <input type="checkbox" onchange="buyMaisonItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
         <label style="flex:1;cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
-        <button class="del-btn" onclick="toggleMaisonItem('${item.id}',false)" title="Retirer de la liste">🗑</button>
-      </div>`).join('')}
-    </div>` : '';
-  const ingSection = ingToBuy.length>0 ? `
-    <div class="card" style="margin-bottom:12px">
-      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">🥕 Ingrédients</h3>
-      ${ingToBuy.map(item=>`
-      <div class="shop-item">
-        <input type="checkbox" onchange="buyIngredientItem('${item.id}')" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
-        <label style="flex:1;cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
-        <button class="del-btn" onclick="toggleMasterIngredient('${item.id}',false)" title="Retirer de la liste">🗑</button>
-      </div>`).join('')}
-    </div>` : '';
-  const pantrySection = pantryToBuy.length>0 ? `
-    <div class="card" style="margin-bottom:12px">
-      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🫙 Placard à racheter</h3>
-      ${pantryToBuy.map(item=>`
-      <div class="shop-item">
-        <input type="checkbox" onchange="buyPantryItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
-        <label style="flex:1;cursor:pointer" onclick="buyPantryItem('${item.id}')">${escHtml(item.name)}</label>
-        <button class="del-btn" onclick="toggleMasterIngredient('${item.id}',false)" title="Retirer de la liste">🗑</button>
+        <button class="del-btn" onclick="toggleMaisonItem('${item.id}',false)">🗑</button>
       </div>`).join('')}
     </div>` : '';
 
-  if (items.length===0) return `
+  // ── Rayons alimentaires ────────────────────────────────
+  const rayonHTML = INGREDIENT_CATS.map(cat => {
+    const catItems = byRayon[cat.k];
+    if (!catItems.length) return '';
+    return `<div style="margin-bottom:14px">
+      <div style="font-weight:700;font-size:.83rem;color:var(--green-dark);padding:5px 0;border-bottom:2px solid var(--green-light);margin-bottom:4px">${cat.l}</div>
+      ${catItems.map(renderShopItem).join('')}
+    </div>`;
+  }).join('');
+
+  if (totalItems===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
     ${weekNav}
-    ${pantrySection}
-    ${ingSection}
     ${maisonSection}
-    ${maisonToBuy.length===0&&ingToBuy.length===0&&pantryToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
-    ${renderHistorySection()}
-  `;
-  const doneCount = items.filter(it=>checked[it.name.toLowerCase().trim()]).length;
+    ${!maisonToBuy.length?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Planifiez des repas ou cochez des articles dans <b>Ingrédients</b> et <b>Maison</b>.</p></div>`:''}
+    ${renderHistorySection()}`;
+
   return `
   <div class="section-header">
     <h2>🛒 Courses — <span style="font-size:.85rem;font-weight:400;color:var(--text-muted)">${fmtDate(ws)} → ${fmtDate(we)}</span></h2>
-    <div class="flex-gap">
-      <button class="btn btn-outline btn-sm" onclick="weekOffset--;render()">◀ Sem. préc.</button>
-      <button class="btn btn-outline btn-sm" onclick="weekOffset++;render()">Sem. suiv. ▶</button>
-      <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
-    </div>
+    <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
   </div>
-  ${pantrySection}
-  ${ingSection}
+  ${weekNav}
   ${maisonSection}
-  <div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between">
-    <span style="font-size:.88rem"><b>${recipeIds.size}</b> recettes · <b>${items.length}</b> ingrédients · <b>${doneCount}</b> cochés</span>
-    <span style="font-size:.82rem;color:var(--text-muted)">${recipeIds.size>0?[...recipeIds].map(id=>recipeById(id)?.name).filter(Boolean).join(' · '):''}</span>
+  <div class="card" style="margin-bottom:12px;padding:10px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+    <span style="font-size:.88rem"><b>${recipeIds.size}</b> recette${recipeIds.size>1?'s':''} · <b>${totalItems}</b> articles · <b>${doneCount}</b> cochés</span>
+    <span style="font-size:.78rem;color:var(--text-muted)">${[...recipeIds].map(id=>recipeById(id)?.name).filter(Boolean).join(' · ')}</span>
   </div>
-  <div class="card">
-  ${items.map(it => {
-    const key = it.name.toLowerCase().trim();
-    const isChecked = !!checked[key];
-    const summary = sumQty(it.entries);
-    return `<div class="shop-item ${isChecked?'checked':''}">
-      <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
-      <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b> <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span></label>
-      <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${key}')" title="On en a déjà — retirer sans noter dans l'historique">🗑</button>
-    </div>`;
-  }).join('')}
+  <div class="card" style="padding:12px 16px">
+    ${rayonHTML}
   </div>
   ${renderHistorySection()}`;
 }
