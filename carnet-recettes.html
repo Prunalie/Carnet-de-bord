@@ -1332,7 +1332,8 @@ function renderShopping() {
       ${maisonToBuy.map(item=>`
       <div class="shop-item">
         <input type="checkbox" onchange="buyMaisonItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
-        <label style="cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
+        <label style="flex:1;cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
+        <button class="del-btn" onclick="toggleMaisonItem('${item.id}',false)" title="Retirer de la liste">🗑</button>
       </div>`).join('')}
     </div>` : '';
   const ingSection = ingToBuy.length>0 ? `
@@ -1341,7 +1342,8 @@ function renderShopping() {
       ${ingToBuy.map(item=>`
       <div class="shop-item">
         <input type="checkbox" onchange="buyIngredientItem('${item.id}')" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
-        <label style="cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
+        <label style="flex:1;cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
+        <button class="del-btn" onclick="toggleMasterIngredient('${item.id}',false)" title="Retirer de la liste">🗑</button>
       </div>`).join('')}
     </div>` : '';
   const pantrySection = pantryToBuy.length>0 ? `
@@ -1350,7 +1352,8 @@ function renderShopping() {
       ${pantryToBuy.map(item=>`
       <div class="shop-item">
         <input type="checkbox" onchange="buyPantryItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
-        <label style="cursor:pointer" onclick="buyPantryItem('${item.id}')">${escHtml(item.name)}</label>
+        <label style="flex:1;cursor:pointer" onclick="buyPantryItem('${item.id}')">${escHtml(item.name)}</label>
+        <button class="del-btn" onclick="toggleMasterIngredient('${item.id}',false)" title="Retirer de la liste">🗑</button>
       </div>`).join('')}
     </div>` : '';
 
