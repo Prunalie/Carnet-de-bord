@@ -436,7 +436,7 @@ function ensureStateFields() {
     });
   }
   // Migration des rayons vers state (personnalisables)
-  if (!state.ingredientCats) state.ingredientCats = JSON.parse(JSON.stringify(INITIAL_ingCats()));
+  if (!state.ingredientCats) state.ingredientCats = JSON.parse(JSON.stringify(INITIAL_INGREDIENT_CATS));
   // S'assurer que chaque ingrédient a un rayon
   state.masterIngredients.forEach(i => { if (!i.cat) i.cat = 'autre'; });
   if (!state.dismissedItems) state.dismissedItems = {};
@@ -607,8 +607,8 @@ const SEASON_OPT = [{v:'printemps',l:'🌱 Printemps'},{v:'été',l:'☀️ Ét�
 const TAG_OPT = [{v:'végétarien',l:'🥦 Végétarien'},{v:'vegan',l:'🌿 Vegan'},{v:'four',l:'♨️ Four'},{v:'poêle',l:'🍳 Poêle'},{v:'casserole',l:'🥘 Casserole'},{v:'vapeur',l:'💨 Vapeur'},{v:'mijotage',l:'⏱️ Mijotage'},{v:'rapide',l:'⚡ Rapide'},{v:'sans cuisson',l:'🥗 Sans cuisson'}];
 const MEAL_OPT = [{v:'matin',l:'🌅 Matin'},{v:'midi',l:'☀️ Midi'},{v:'soir',l:'🌙 Soir'}];
 const MAISON_CATS = [{k:'salle-bain',l:'🛁 Salle de bain'},{k:'wc',l:'🚽 WC'},{k:'cuisine',l:'🍽️ Cuisine'},{k:'entretien',l:'🧹 Entretien'},{k:'autre',l:'📦 Autre'}];
-const INITIAL_ingCats() = [{k:'legumes',l:'🥦 Légumes & fruits'},{k:'viandes',l:'🥩 Viandes & poissons'},{k:'laitiers',l:'🥛 Produits laitiers'},{k:'epicerie',l:'🛒 Épicerie sèche'},{k:'conserves',l:'🥫 Conserves'},{k:'condiments',l:'🧄 Condiments & épices'},{k:'autre',l:'📦 Autre'}];
-function ingCats() { return state.ingredientCats || INITIAL_ingCats(); }
+const INITIAL_INGREDIENT_CATS = [{k:'legumes',l:'🥦 Légumes & fruits'},{k:'viandes',l:'🥩 Viandes & poissons'},{k:'laitiers',l:'🥛 Produits laitiers'},{k:'epicerie',l:'🛒 Épicerie sèche'},{k:'conserves',l:'🥫 Conserves'},{k:'condiments',l:'🧄 Condiments & épices'},{k:'autre',l:'📦 Autre'}];
+function ingCats() { return state.ingredientCats || INITIAL_INGREDIENT_CATS; }
 function recipeById(id) { return state.recipes.find(r => r.id===id); }
 function getOrCreatePlan(weekKey) {
   let plan = state.weeklyPlans.find(p => p.weekStart===weekKey);
