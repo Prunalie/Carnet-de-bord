@@ -17,17 +17,25 @@
 }
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 /* HEADER */
-#header{background:var(--green-dark);color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-#header h1{font-size:1.2rem;font-weight:700;padding:14px 0;white-space:nowrap}
-#header h1 span{font-size:1.4rem}
-nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
-nav button{background:none;border:none;color:rgba(255,255,255,.7);padding:14px 16px;cursor:pointer;font-size:.9rem;border-bottom:3px solid transparent;transition:.2s;white-space:nowrap}
-nav button:hover{color:#fff}
-nav button.active{color:#fff;border-bottom-color:var(--amber)}
-#sync-btn{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap;margin:8px 0}
+#header{background:var(--green-dark);color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:50px;position:sticky;top:0;z-index:150}
+#header h1{font-size:1rem;font-weight:700;white-space:nowrap}
+#header h1 span{font-size:1.2rem}
+#sync-btn{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.8rem;font-weight:600;white-space:nowrap}
 #sync-btn:hover{background:#d4a55a}
+/* BOTTOM NAV */
+#bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--green-dark);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 10px rgba(0,0,0,.2)}
+#bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px 8px;background:none;border:none;border-top:2px solid transparent;color:rgba(255,255,255,.5);font-size:.55rem;cursor:pointer;gap:2px;min-height:56px;transition:.15s}
+#bottom-nav button .ni{font-size:1.35rem;line-height:1}
+#bottom-nav button.active{color:var(--amber);border-top-color:var(--amber)}
 /* MAIN */
-#main{max-width:1100px;margin:0 auto;padding:24px 16px}
+#main{max-width:1100px;margin:0 auto;padding:16px 16px 80px}
+/* HOME */
+.home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.home-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 12px;cursor:pointer;border:2px solid transparent;transition:.2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.home-card:active{border-color:var(--green);background:var(--green-light)}
+.home-card .hc-icon{font-size:2rem}
+.home-card .hc-label{font-weight:700;color:var(--green-dark);font-size:.9rem}
+.home-card .hc-stat{font-size:.75rem;color:var(--text-muted)}
 /* CARDS */
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
@@ -120,11 +128,11 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 </head>
 <body>
 <div id="header">
-  <h1><span>🍽️</span> Carnet de Recettes</h1>
-  <nav id="nav"></nav>
+  <h1><span>🍽️</span> Carnet de Bord</h1>
   <button id="sync-btn" onclick="toggleSync()">💾 Données</button>
 </div>
 <div id="main"></div>
+<nav id="bottom-nav"></nav>
 
 <!-- Modals -->
 <div class="overlay" id="modal-overlay"><div class="modal" id="modal-content"></div></div>
@@ -462,13 +470,24 @@ function toggleSync() {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
 const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'},{id:'ingredients',icon:'🥕',label:'Ingrédients'},{id:'maison',icon:'🏠',label:'Maison'}];
-let activeTab = 'recipes';
+let activeTab = 'home';
 let activeFilters = {mealType:null, season:null, tag:null, search:''};
-let weekOffset = 0; // 0 = semaine courante
+let weekOffset = 0;
 
+const NAV_TABS = [
+  {id:'home',      icon:'🏡', label:'Accueil'},
+  {id:'recipes',   icon:'🍽️', label:'Recettes'},
+  {id:'planner',   icon:'📅', label:'Planning'},
+  {id:'shopping',  icon:'🛒', label:'Courses'},
+  {id:'ingredients',icon:'🥕',label:'Ingréd.'},
+  {id:'maison',    icon:'🧴', label:'Maison'},
+  {id:'profiles',  icon:'👤', label:'Profils'},
+];
 function renderNav() {
-  document.getElementById('nav').innerHTML = TABS.map(t =>
-    `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">${t.icon} ${t.label}</button>`
+  document.getElementById('bottom-nav').innerHTML = NAV_TABS.map(t =>
+    `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">
+      <span class="ni">${t.icon}</span><span>${t.label}</span>
+    </button>`
   ).join('');
 }
 function setTab(id) { activeTab = id; render(); }
@@ -504,12 +523,46 @@ function getOrCreatePlan(weekKey) {
 function render() {
   renderNav();
   const main = document.getElementById('main');
-  if (activeTab==='profiles') main.innerHTML = renderProfiles();
+  if (activeTab==='home') main.innerHTML = renderHome();
+  else if (activeTab==='profiles') main.innerHTML = renderProfiles();
   else if (activeTab==='recipes') main.innerHTML = renderRecipes();
   else if (activeTab==='planner') main.innerHTML = renderPlanner();
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
   else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
   else if (activeTab==='maison') main.innerHTML = renderMaison();
+}
+function renderHome() {
+  const p1 = state.profiles?.[0], p2 = state.profiles?.[1];
+  const ws = getWeekStart(0);
+  const weekKey = ws.toISOString().slice(0,10);
+  const plan = (state.weeklyPlans||[]).find(p=>p.weekStart===weekKey);
+  const plannedCount = plan ? Object.values(plan.days||{}).reduce((n,d)=>n+Object.keys(d).length,0) : 0;
+  const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy).length;
+  const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy).length;
+  const totalToBuy = ingToBuy + maisonToBuy;
+  const cards = [
+    {tab:'recipes',    icon:'🍽️', label:'Recettes',    stat:`${state.recipes.length} recettes`},
+    {tab:'planner',    icon:'📅', label:'Planning',    stat:`${plannedCount} repas cette semaine`},
+    {tab:'shopping',   icon:'🛒', label:'Courses',     stat:`${totalToBuy} article${totalToBuy!==1?'s':''} à acheter`},
+    {tab:'ingredients',icon:'🥕', label:'Ingrédients', stat:`${(state.ingredientItems||[]).length} ingrédients`},
+    {tab:'maison',     icon:'🧴', label:'Maison',      stat:`${(state.maisonItems||[]).length} produits`},
+    {tab:'profiles',   icon:'👤', label:'Profils',     stat:`${p1?.name||'Profil 1'} & ${p2?.name||'Profil 2'}`},
+  ];
+  return `
+  <div class="section-header" style="margin-bottom:20px">
+    <h2>👋 Bonjour !</h2>
+  </div>
+  <div class="home-grid">
+    ${cards.map(c=>`<div class="home-card" onclick="setTab('${c.tab}')">
+      <div class="hc-icon">${c.icon}</div>
+      <div class="hc-label">${c.label}</div>
+      <div class="hc-stat">${c.stat}</div>
+    </div>`).join('')}
+  </div>
+  <div class="card" style="margin-top:4px;min-height:110px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-muted)">
+    <div style="font-size:2.2rem">📊</div>
+    <div style="font-size:.85rem">Graphiques à venir…</div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -625,7 +678,8 @@ function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
 function renderMain() {
   const m = document.getElementById('main');
-  if (activeTab==='recipes') m.innerHTML=renderRecipes();
+  if (activeTab==='home') m.innerHTML=renderHome();
+  else if (activeTab==='recipes') m.innerHTML=renderRecipes();
   else if (activeTab==='profiles') m.innerHTML=renderProfiles();
   else if (activeTab==='planner') m.innerHTML=renderPlanner();
   else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
