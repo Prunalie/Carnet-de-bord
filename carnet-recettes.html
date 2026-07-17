@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr"><!-- v2 -->
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -585,12 +585,11 @@ function renderRecipes() {
     ${filterBtn('🥦 Végétarien','tag','végétarien')}${filterBtn('♨️ Four','tag','four')}${filterBtn('⚡ Rapide','tag','rapide')}
     ${f.mealType||f.season||f.tag||f.search?`<button class="filter-btn" onclick="clearFilters()" style="color:#B91C1C;border-color:#FECACA">✕ Effacer</button>`:''}
   </div>
-  <div id="recipe-cards-container">${recipes.length===0?'<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>':
-    `<div class="card-grid">${recipes.map(r => `
-    <div class="recipe-card" onclick="openRecipeDetail('${r.id}')">
-      <div class="rc-name">${escHtml(r.name)}</div>
-      <div class="rc-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
-      <div class="tags">
+  <div id="recipe-cards-container"><div class="card-grid" id="recipe-card-grid">${state.recipes.map(r => `
+    <div class="recipe-card" data-id="${r.id}" data-name="${escHtml(r.name.toLowerCase())}" data-mealtype="${r.mealType.join(',')}" data-season="${(r.season||[]).join(',')}" data-tags="${r.tags.join(',')}">
+      <div class="rc-name" onclick="openRecipeDetail('${r.id}')">${escHtml(r.name)}</div>
+      <div class="rc-meta" onclick="openRecipeDetail('${r.id}')">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
+      <div class="tags" onclick="openRecipeDetail('${r.id}')">
         ${r.mealType.map(m=>MEAL_OPT.find(x=>x.v===m)?.l||m).map(l=>`<span class="tag amber">${l}</span>`).join('')}
         ${(r.season||[]).filter(s=>s!=='toutes').map(s=>`<span class="tag season">${s}</span>`).join('')}
         ${r.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
@@ -599,37 +598,28 @@ function renderRecipes() {
         <button class="btn btn-outline btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openRecipeForm('${r.id}')">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')" title="Supprimer">🗑</button>
       </div>
-    </div>`).join('')}</div>`}</div>`;
+    </div>`).join('')}</div></div>`;
 }
 function filterRecipeCards() {
   const f = activeFilters;
-  const recipes = state.recipes.filter(r => {
-    if (f.mealType && !r.mealType.includes(f.mealType)) return false;
-    if (f.season && r.season && !r.season.includes(f.season) && !r.season.includes('toutes')) return false;
-    if (f.tag && !r.tags.includes(f.tag)) return false;
-    if (f.search && !r.name.toLowerCase().includes(f.search.toLowerCase())) return false;
-    return true;
+  const search = (f.search||'').toLowerCase();
+  const cards = document.querySelectorAll('#recipe-card-grid .recipe-card');
+  if (!cards.length) { renderMain(); return; }
+  let visible = 0;
+  cards.forEach(card => {
+    const name = card.dataset.name || '';
+    const mealtype = card.dataset.mealtype || '';
+    const season = card.dataset.season || '';
+    const tags = card.dataset.tags || '';
+    const show = (!f.mealType || mealtype.split(',').includes(f.mealType))
+      && (!f.season || season.split(',').some(s=>s===f.season||s==='toutes'))
+      && (!f.tag || tags.split(',').includes(f.tag))
+      && (!search || name.includes(search));
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
   });
   const count = document.getElementById('recipe-count');
-  if (count) count.textContent = `(${recipes.length}/${state.recipes.length})`;
-  const container = document.getElementById('recipe-cards-container');
-  if (!container) { renderMain(); return; }
-  container.innerHTML = recipes.length===0
-    ? '<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>'
-    : `<div class="card-grid">${recipes.map(r=>`
-    <div class="recipe-card" onclick="openRecipeDetail('${r.id}')">
-      <div class="rc-name">${escHtml(r.name)}</div>
-      <div class="rc-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
-      <div class="tags">
-        ${r.mealType.map(m=>MEAL_OPT.find(x=>x.v===m)?.l||m).map(l=>`<span class="tag amber">${l}</span>`).join('')}
-        ${(r.season||[]).filter(s=>s!=='toutes').map(s=>`<span class="tag season">${s}</span>`).join('')}
-        ${r.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
-      </div>
-      <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
-        <button class="btn btn-outline btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openRecipeForm('${r.id}')">✏️</button>
-        <button class="del-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')" title="Supprimer">🗑</button>
-      </div>
-    </div>`).join('')}</div>`;
+  if (count) count.textContent = `(${visible}/${state.recipes.length})`;
 }
 function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?null:val; renderMain(); }
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
@@ -864,7 +854,7 @@ function renderHistorySection() {
   const typeLabel = t => t==='maison'?'🏠':t==='ingredient'?'🥕':'🍽️';
   return `
   <div style="margin-top:24px">
-    <details>
+    <details open>
       <summary style="cursor:pointer;font-weight:700;color:var(--text-muted);font-size:.95rem;padding:10px 0;list-style:none;display:flex;align-items:center;justify-content:space-between">
         <span>📋 Historique des courses (${hist.length})</span><span style="font-size:.8rem">▼</span>
       </summary>
