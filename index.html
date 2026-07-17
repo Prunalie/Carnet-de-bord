@@ -575,22 +575,21 @@ function renderRecipes() {
   const filterBtn = (label, key, val) => `<button class="filter-btn ${f[key]===val?'on':''}" onclick="toggleFilter('${key}','${val}')">${label}</button>`;
   return `
   <div class="section-header">
-    <h2>🍽️ Recettes <span style="font-size:.85rem;color:var(--text-muted);font-weight:400">(${recipes.length}/${state.recipes.length})</span></h2>
+    <h2>🍽️ Recettes <span id="recipe-count" style="font-size:.85rem;color:var(--text-muted);font-weight:400">(${recipes.length}/${state.recipes.length})</span></h2>
     <button class="btn btn-primary" onclick="openRecipeForm()">+ Ajouter une recette</button>
   </div>
   <div class="filters">
-    <input class="search-box" type="text" placeholder="🔍 Rechercher…" value="${escHtml(f.search)}" oninput="activeFilters.search=this.value;renderMain()">
+    <input class="search-box" type="text" placeholder="🔍 Rechercher…" value="${escHtml(f.search)}" oninput="activeFilters.search=this.value;filterRecipeCards()" autocomplete="off" autocorrect="off" autocapitalize="off">
     ${filterBtn('🌅 Matin','mealType','matin')}${filterBtn('☀️ Midi','mealType','midi')}${filterBtn('🌙 Soir','mealType','soir')}
     ${filterBtn('🌱 Printemps','season','printemps')}${filterBtn('☀️ Été','season','été')}${filterBtn('🍂 Automne','season','automne')}${filterBtn('❄️ Hiver','season','hiver')}
     ${filterBtn('🥦 Végétarien','tag','végétarien')}${filterBtn('♨️ Four','tag','four')}${filterBtn('⚡ Rapide','tag','rapide')}
     ${f.mealType||f.season||f.tag||f.search?`<button class="filter-btn" onclick="clearFilters()" style="color:#B91C1C;border-color:#FECACA">✕ Effacer</button>`:''}
   </div>
-  ${recipes.length===0?'<div class="empty-state"><div class="icon">🔍</div><p>Aucune recette ne correspond aux filtres.</p></div>':
-    `<div class="card-grid">${recipes.map(r => `
-    <div class="recipe-card" onclick="openRecipeDetail('${r.id}')">
-      <div class="rc-name">${escHtml(r.name)}</div>
-      <div class="rc-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
-      <div class="tags">
+  <div id="recipe-cards-container"><div class="card-grid" id="recipe-card-grid">${state.recipes.map(r => `
+    <div class="recipe-card" data-id="${r.id}" data-name="${escHtml(r.name.toLowerCase())}" data-mealtype="${r.mealType.join(',')}" data-season="${(r.season||[]).join(',')}" data-tags="${r.tags.join(',')}">
+      <div class="rc-name" onclick="openRecipeDetail('${r.id}')">${escHtml(r.name)}</div>
+      <div class="rc-meta" onclick="openRecipeDetail('${r.id}')">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
+      <div class="tags" onclick="openRecipeDetail('${r.id}')">
         ${r.mealType.map(m=>MEAL_OPT.find(x=>x.v===m)?.l||m).map(l=>`<span class="tag amber">${l}</span>`).join('')}
         ${(r.season||[]).filter(s=>s!=='toutes').map(s=>`<span class="tag season">${s}</span>`).join('')}
         ${r.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
@@ -599,7 +598,28 @@ function renderRecipes() {
         <button class="btn btn-outline btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openRecipeForm('${r.id}')">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')" title="Supprimer">🗑</button>
       </div>
-    </div>`).join('')}</div>`}`;
+    </div>`).join('')}</div></div>`;
+}
+function filterRecipeCards() {
+  const f = activeFilters;
+  const search = (f.search||'').toLowerCase();
+  const cards = document.querySelectorAll('#recipe-card-grid .recipe-card');
+  if (!cards.length) { renderMain(); return; }
+  let visible = 0;
+  cards.forEach(card => {
+    const name = card.dataset.name || '';
+    const mealtype = card.dataset.mealtype || '';
+    const season = card.dataset.season || '';
+    const tags = card.dataset.tags || '';
+    const show = (!f.mealType || mealtype.split(',').includes(f.mealType))
+      && (!f.season || season.split(',').some(s=>s===f.season||s==='toutes'))
+      && (!f.tag || tags.split(',').includes(f.tag))
+      && (!search || name.includes(search));
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const count = document.getElementById('recipe-count');
+  if (count) count.textContent = `(${visible}/${state.recipes.length})`;
 }
 function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?null:val; renderMain(); }
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
@@ -777,17 +797,17 @@ function clearSlot(weekKey, day, meal) {
 let _pickerTarget = null;
 function openRecipePicker(weekKey, day, meal) {
   _pickerTarget = {weekKey, day, meal};
-  const mealRecipes = state.recipes.filter(r=>r.mealType.includes(meal));
+  const allRecipes = [...state.recipes].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const pc = document.getElementById('picker-content');
   pc.innerHTML = `
     <button class="modal-close" onclick="closePicker()">×</button>
     <h2>Choisir une recette · ${DAYS.find((_,i)=>DAYS_K[i]===day)||day} ${meal}</h2>
-    <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)">
+    <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="recipe-picker" id="recipe-picker-list">
-      ${mealRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}')">
+      ${allRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}')">
         <div><div class="pi-name">${escHtml(r.name)}</div><div class="pi-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers. · ${r.tags.slice(0,3).join(', ')}</div></div>
       </div>`).join('')}
-      ${mealRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette pour ce type de repas. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
+      ${allRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette disponible. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
     </div>`;
   document.getElementById('picker-overlay').classList.add('open');
 }
@@ -808,6 +828,13 @@ function closePicker() { document.getElementById('picker-overlay').classList.rem
 // ═══════════════════════════════════════════════════════
 // HISTORIQUE
 // ═══════════════════════════════════════════════════════
+function clearHistory() {
+  if (!confirm('Effacer tout l\'historique ?')) return;
+  state.shoppingHistory = [];
+  save();
+  renderMain();
+}
+
 function addToHistory(item, action, type) {
   if (!state.shoppingHistory) state.shoppingHistory = [];
   state.shoppingHistory.unshift({ts: Date.now(), item, action, type});
@@ -827,7 +854,7 @@ function renderHistorySection() {
   const typeLabel = t => t==='maison'?'🏠':t==='ingredient'?'🥕':'🍽️';
   return `
   <div style="margin-top:24px">
-    <details>
+    <details open>
       <summary style="cursor:pointer;font-weight:700;color:var(--text-muted);font-size:.95rem;padding:10px 0;list-style:none;display:flex;align-items:center;justify-content:space-between">
         <span>📋 Historique des courses (${hist.length})</span><span style="font-size:.8rem">▼</span>
       </summary>
@@ -839,7 +866,7 @@ function renderHistorySection() {
           <span style="flex:1"><b>${escHtml(h.item)}</b> <span style="color:var(--text-muted)">${h.action==='bought'?'✅ acheté':'🛒 ajouté aux courses'}</span></span>
         </div>`).join('')}
       </div>
-      <button class="btn btn-sm" style="margin-top:8px;color:#B91C1C;border:1.5px solid #FECACA;background:#fff" onclick="if(confirm('Effacer tout l\'historique ?')){state.shoppingHistory=[];save();renderMain()}">🗑️ Effacer l'historique</button>
+      <button class="btn btn-sm" style="margin-top:8px;color:#B91C1C;border:1.5px solid #FECACA;background:#fff" onclick="clearHistory()">🗑️ Effacer l'historique</button>
     </details>
   </div>`;
 }
