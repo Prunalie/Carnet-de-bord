@@ -439,6 +439,7 @@ function ensureStateFields() {
   if (!state.ingredientCats) state.ingredientCats = JSON.parse(JSON.stringify(INITIAL_INGREDIENT_CATS));
   // S'assurer que chaque ingrédient a un rayon
   state.masterIngredients.forEach(i => { if (!i.cat) i.cat = 'autre'; });
+  if (!state.notes) state.notes = '';
   if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.shoppingHistory) state.shoppingHistory = [];
 }
@@ -577,6 +578,7 @@ const NAV_TABS = [
   {id:'shopping',  icon:'🛒', label:'Courses'},
   {id:'ingredients',icon:'🥕',label:'Ingréd.'},
   {id:'maison',    icon:'🧴', label:'Maison'},
+  {id:'notes',     icon:'📝', label:'Notes'},
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
 function renderNav() {
@@ -629,6 +631,7 @@ function render() {
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
   else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
   else if (activeTab==='maison') main.innerHTML = renderMaison();
+  else if (activeTab==='notes') main.innerHTML = renderNotes();
 }
 function renderHome() {
   const p1 = state.profiles?.[0], p2 = state.profiles?.[1];
@@ -784,6 +787,7 @@ function renderMain() {
   else if (activeTab==='planner') m.innerHTML=renderPlanner();
   else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
   else if (activeTab==='maison') m.innerHTML=renderMaison();
+  else if (activeTab==='notes') m.innerHTML=renderNotes();
   else m.innerHTML=renderShopping();
 }
 
@@ -1363,6 +1367,19 @@ function deleteRayon(k) {
 // ═══════════════════════════════════════════════════════
 // MAISON
 // ═══════════════════════════════════════════════════════
+function renderNotes() {
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h2 style="font-size:1.1rem;color:var(--green-dark)">📝 Notes</h2>
+    <button class="btn btn-sm btn-outline" onclick="if(confirm('Effacer toutes les notes ?')){state.notes='';save();renderMain()}">🗑 Effacer</button>
+  </div>
+  <textarea id="notes-area" placeholder="Écrivez tout ce que vous voulez…" oninput="saveNotes(this.value)" style="width:100%;min-height:calc(100vh - 200px);padding:14px;border:1.5px solid var(--border);border-radius:10px;font-size:.95rem;font-family:inherit;line-height:1.6;resize:vertical;background:var(--card);color:inherit;box-sizing:border-box">${escHtml(state.notes||'')}</textarea>`;
+}
+function saveNotes(val) {
+  state.notes = val;
+  save();
+}
+
 function renderMaison() {
   if (!state.maisonItems) state.maisonItems = [];
   const toBuyCount = state.maisonItems.filter(i=>i.needToBuy).length;
