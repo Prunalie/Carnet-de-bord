@@ -109,6 +109,11 @@ textarea{resize:vertical;min-height:80px}
 .shop-section{margin-bottom:20px}
 .shop-section h3{font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid var(--green-light)}
 .shop-item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--green-light)}
+.ing-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:9px;margin-bottom:7px;background:var(--card);border:1.5px solid var(--border);transition:.15s}
+.ing-item .ing-name{flex:1;font-size:.95rem;cursor:pointer;user-select:none}
+.seg-tabs{display:flex;background:var(--green-light);border-radius:10px;padding:4px;margin-bottom:14px;gap:4px}
+.seg-tab{flex:1;padding:9px 6px;border:none;border-radius:7px;font-weight:700;font-size:.85rem;cursor:pointer;transition:.15s;background:none;color:var(--green-dark)}
+.seg-tab.active{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.14)}
 .shop-item label{cursor:pointer;font-size:.9rem;flex:1}
 .shop-item input[type=checkbox]{accent-color:var(--green);width:16px;height:16px;cursor:pointer}
 .shop-item.checked label{text-decoration:line-through;color:var(--text-muted)}
@@ -1108,50 +1113,74 @@ function renderHistorySection() {
 // ═══════════════════════════════════════════════════════
 // PLACARD & INGRÉDIENTS
 // ═══════════════════════════════════════════════════════
+let _ingTab = 'pantry';
+function setIngTab(t) { _ingTab = t; renderMain(); }
+
+function filterIngredients(q) {
+  const v = q.toLowerCase().trim();
+  document.querySelectorAll('#ing-items-list .ing-item').forEach(el => {
+    el.style.display = el.dataset.name.includes(v) ? '' : 'none';
+  });
+}
+
 function renderIngredients() {
   const mi = state.masterIngredients || [];
   const pantry = [...mi.filter(i=>i.type==='pantry')].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const shopping = [...mi.filter(i=>i.type==='shopping')].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const pantryToBuy = pantry.filter(i=>i.needToBuy).length;
   const ingToBuy = shopping.filter(i=>i.needToBuy).length;
-  const badge = n => n>0 ? `<span style="font-size:.75rem;background:var(--green);color:#fff;border-radius:20px;padding:1px 8px;margin-left:6px">${n}</span>` : '';
+  const isPantry = _ingTab === 'pantry';
+  const items = isPantry ? pantry : shopping;
+  const accent = isPantry ? 'var(--amber)' : 'var(--green)';
+  const accentLight = isPantry ? 'var(--amber-light)' : 'var(--green-light)';
+
+  const tabBadge = (n, color) => n > 0
+    ? `<span style="background:${color};color:#fff;border-radius:10px;padding:1px 7px;margin-left:5px;font-size:.72rem">${n} à ${isPantry?'racheter':'acheter'}</span>`
+    : '';
+
   return `
-  <h2 style="font-size:1.2rem;color:var(--green-dark);margin-bottom:16px">🥕 Ingrédients & Placard</h2>
-
-  <!-- PLACARD -->
-  <div class="card" style="margin-bottom:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--amber-light)">
-      <h3 style="font-weight:700;color:var(--green-dark)">🫙 Mon placard ${badge(pantryToBuy)}</h3>
-      <button class="btn btn-sm btn-outline" onclick="openAddMasterIngredient('pantry')">+ Ajouter</button>
-    </div>
-    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px">Ces ingrédients sont toujours chez vous. Cochez ceux à racheter → ils apparaissent dans les courses. Les ingrédients du placard présents dans vos recettes ne sont pas mis automatiquement dans la liste.</p>
-    ${pantry.map(item=>`
-    <div class="shop-item" style="${item.needToBuy?'background:var(--amber-light);border-radius:6px;padding:3px 6px;':''}">
-      <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
-      <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleMasterIngredient('${item.id}',${!item.needToBuy})">
-        ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
-      </label>
-      <button onclick="changeMasterIngType('${item.id}')" title="Déplacer vers Ingrédients ponctuels" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">→ Ponct.</button>
-      <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')" title="Supprimer">🗑</button>
-    </div>`).join('')}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h2 style="font-size:1.1rem;color:var(--green-dark)">🥕 Ingrédients & Placard</h2>
+    <button class="btn btn-sm btn-primary" onclick="openAddMasterIngredient('${_ingTab}')">+ Ajouter</button>
   </div>
 
-  <!-- INGRÉDIENTS PONCTUELS -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <h3 style="font-weight:700;color:var(--green-dark)">🛒 Ingrédients ponctuels ${badge(ingToBuy)}</h3>
-    <button class="btn btn-sm btn-primary" onclick="openAddMasterIngredient('shopping')">+ Ajouter</button>
+  <!-- Sous-onglets -->
+  <div class="seg-tabs">
+    <button class="seg-tab ${isPantry?'active':''}" onclick="setIngTab('pantry')">
+      🫙 Placard
+      <span style="font-weight:400;font-size:.78rem;color:${isPantry?'var(--text-muted)':'var(--text-muted)'}"> (${pantry.length})</span>
+      ${pantryToBuy?`<span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${pantryToBuy}</span>`:''}
+    </button>
+    <button class="seg-tab ${!isPantry?'active':''}" onclick="setIngTab('shopping')">
+      🛒 Ponctuels
+      <span style="font-weight:400;font-size:.78rem;color:var(--text-muted)"> (${shopping.length})</span>
+      ${ingToBuy?`<span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${ingToBuy}</span>`:''}
+    </button>
   </div>
-  <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">Cochez pour ajouter aux courses.</p>
-  ${shopping.length===0?`<p style="text-align:center;color:var(--text-muted);padding:20px 0">Aucun ingrédient ponctuel.</p>`:''}
-  ${shopping.map(item=>`
-    <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:3px 6px;margin-bottom:4px;':'margin-bottom:4px;'}">
-      <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
-      <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleMasterIngredient('${item.id}',${!item.needToBuy})">
-        ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--green)">→ courses</span>':''}
-      </label>
-      <button onclick="changeMasterIngType('${item.id}')" title="Déplacer vers Placard" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">→ Placard</button>
-      <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')" title="Supprimer">🗑</button>
-    </div>`).join('')}`;
+
+  <!-- Recherche -->
+  <input type="search" class="search-box" placeholder="🔍 Rechercher…" oninput="filterIngredients(this.value)" style="width:100%;margin-bottom:12px" autocomplete="off" autocorrect="off">
+
+  <!-- Description -->
+  <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">
+    ${isPantry
+      ? 'Ingrédients toujours en stock. Cochez ceux à racheter → ils apparaissent dans les courses. Le placard filtre automatiquement les recettes planifiées.'
+      : 'Ingrédients à acheter ponctuellement. Cochez pour les ajouter à la liste de courses.'}
+  </p>
+
+  <!-- Liste -->
+  ${items.length === 0 ? `<div class="empty-state"><p>Aucun ingrédient ici.<br>Cliquez sur <b>+ Ajouter</b> pour commencer.</p></div>` : ''}
+  <div id="ing-items-list">
+    ${items.map(item => {
+      const marked = item.needToBuy;
+      return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${marked?`border-color:${accent};background:${accentLight};`:''}">
+        <input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
+        <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>
+        <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.73rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">${isPantry?'→ Ponct.':'→ Placard'}</button>
+        <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')">🗑</button>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function toggleMasterIngredient(id, val) {
