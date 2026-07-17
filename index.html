@@ -1152,10 +1152,12 @@ function renderIngredients() {
 
   const renderItem = item => {
     const marked = item.needToBuy;
+    const catSelectOpts = ingCats().map(c=>`<option value="${c.k}" ${(item.cat||'autre')===c.k?'selected':''}>${c.l}</option>`).join('');
     return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${marked?`border-color:${accent};background:${accentLight};`:''}">
       <input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
       <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>
-      <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.73rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">${isPantry?'→ Ponct.':'→ Placard'}</button>
+      <select onchange="changeMasterIngCat('${item.id}',this.value)" style="border:1.5px solid var(--border);border-radius:6px;padding:3px 2px;font-size:.75rem;background:var(--card);cursor:pointer;max-width:130px;color:var(--text-muted)">${catSelectOpts}</select>
+      <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:.72rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;flex-shrink:0">${isPantry?'→ Ponct.':'→ Placard'}</button>
       <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')">🗑</button>
     </div>`;
   };
@@ -1220,6 +1222,13 @@ function deleteMasterIngredient(id) {
   if (!item) return;
   if (!confirm(`Supprimer "${item.name}" de la liste ?`)) return;
   state.masterIngredients = state.masterIngredients.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+
+function changeMasterIngCat(id, cat) {
+  const item = (state.masterIngredients||[]).find(i=>i.id===id);
+  if (!item) return;
+  item.cat = cat;
   save(); renderMain();
 }
 
