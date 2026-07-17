@@ -984,50 +984,74 @@ function selectRecipe(recipeId) {
 }
 function closePicker() { document.getElementById('picker-overlay').classList.remove('open'); }
 
+let _planWeekOffset = 0;
+let _planRecipeId = null;
+
 function openPlanFromRecipe(recipeId) {
+  _planRecipeId = recipeId;
+  _planWeekOffset = weekOffset;
   const r = recipeById(recipeId); if (!r) return;
-  const ws = getWeekStart(weekOffset);
-  const weekKey = ws.toISOString().slice(0,10);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dayOpts = DAYS_K.map((dk, i) => {
-    const dt = new Date(ws); dt.setDate(dt.getDate() + i);
-    const isToday = dt.toDateString() === today.toDateString();
-    return `<option value="${dk}" ${isToday?'selected':''}>${DAYS[i]} ${fmtDate(dt)}</option>`;
-  }).join('');
-  // Pré-sélectionner le repas selon l'heure
   const h = new Date().getHours();
   const defaultMeal = h < 11 ? 'matin' : h < 15 ? 'midi' : 'soir';
   document.getElementById('modal-content').innerHTML = `
     <button class="modal-close" onclick="closeModal()">×</button>
     <h2>📅 Planifier</h2>
-    <p style="font-weight:700;color:var(--green-dark);margin-bottom:16px">${escHtml(r.name)}</p>
+    <p style="font-weight:700;color:var(--green-dark);margin-bottom:14px">${escHtml(r.name)}</p>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+      <button class="btn btn-outline btn-sm" onclick="shiftPlanWeek(-1)">◀</button>
+      <span id="plan-week-label" style="flex:1;text-align:center;font-size:.82rem;color:var(--text-muted)"></span>
+      <button class="btn btn-outline btn-sm" onclick="shiftPlanWeek(1)">▶</button>
+    </div>
     <div class="form-group"><label>Jour</label>
-      <select id="plan-day">${dayOpts}</select>
+      <select id="plan-day"></select>
     </div>
     <div class="form-group"><label>Repas</label>
       <select id="plan-meal">
         ${MEALS.map(m=>`<option value="${m.k}" ${m.k===defaultMeal?'selected':''}>${m.label}</option>`).join('')}
       </select>
     </div>
-    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 16px">Semaine du ${fmtDate(ws)}</p>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="confirmPlanRecipe('${weekKey}','${recipeId}')">✔ Ajouter</button>
+      <button id="plan-confirm-btn" class="btn btn-primary">✔ Ajouter</button>
     </div>`;
+  document.getElementById('plan-confirm-btn').onclick = confirmPlanRecipe;
   openModal();
+  refreshPlanModalWeek();
 }
 
-function confirmPlanRecipe(weekKey, recipeId) {
+function shiftPlanWeek(delta) {
+  _planWeekOffset += delta;
+  refreshPlanModalWeek();
+}
+
+function refreshPlanModalWeek() {
+  const ws = getWeekStart(_planWeekOffset);
+  const we = new Date(ws); we.setDate(we.getDate()+6);
+  const weekKey = ws.toISOString().slice(0,10);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sel = document.getElementById('plan-day');
+  const prev = sel.value;
+  sel.innerHTML = DAYS_K.map((dk, i) => {
+    const dt = new Date(ws); dt.setDate(dt.getDate() + i);
+    const isToday = dt.toDateString() === today.toDateString();
+    const selected = prev ? prev === dk : isToday;
+    return `<option value="${dk}" ${selected?'selected':''}>${DAYS[i]} ${fmtDate(dt)}</option>`;
+  }).join('');
+  document.getElementById('plan-week-label').textContent = `${fmtDate(ws)} — ${fmtDate(we)}`;
+  document.getElementById('plan-confirm-btn').dataset.weekkey = weekKey;
+}
+
+function confirmPlanRecipe() {
   const day = document.getElementById('plan-day').value;
   const meal = document.getElementById('plan-meal').value;
+  const weekKey = document.getElementById('plan-confirm-btn').dataset.weekkey;
   const plan = getOrCreatePlan(weekKey);
   if (!plan.days[day]) plan.days[day] = {};
-  plan.days[day][meal] = recipeId;
+  plan.days[day][meal] = _planRecipeId;
   save(); closeModal();
-  const r = recipeById(recipeId);
+  const r = recipeById(_planRecipeId);
   const dayLabel = DAYS[DAYS_K.indexOf(day)];
   const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
-  // Toast de confirmation
   const t = document.createElement('div');
   t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green-dark);color:#fff;padding:10px 20px;border-radius:20px;font-size:.88rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3)';
   t.textContent = `✅ ${r?.name} → ${dayLabel} ${mealLabel}`;
@@ -1107,7 +1131,8 @@ function renderIngredients() {
       <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleMasterIngredient('${item.id}',${!item.needToBuy})">
         ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
       </label>
-      <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')" title="Retirer du placard">🗑</button>
+      <button onclick="changeMasterIngType('${item.id}')" title="Déplacer vers Ingrédients ponctuels" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">→ Ponct.</button>
+      <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')" title="Supprimer">🗑</button>
     </div>`).join('')}
   </div>
 
@@ -1124,6 +1149,7 @@ function renderIngredients() {
       <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleMasterIngredient('${item.id}',${!item.needToBuy})">
         ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--green)">→ courses</span>':''}
       </label>
+      <button onclick="changeMasterIngType('${item.id}')" title="Déplacer vers Placard" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;color:var(--text-muted);cursor:pointer;white-space:nowrap">→ Placard</button>
       <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')" title="Supprimer">🗑</button>
     </div>`).join('')}`;
 }
@@ -1153,6 +1179,13 @@ function deleteMasterIngredient(id) {
   if (!item) return;
   if (!confirm(`Supprimer "${item.name}" de la liste ?`)) return;
   state.masterIngredients = state.masterIngredients.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+
+function changeMasterIngType(id) {
+  const item = (state.masterIngredients||[]).find(i=>i.id===id);
+  if (!item) return;
+  item.type = item.type === 'pantry' ? 'shopping' : 'pantry';
   save(); renderMain();
 }
 
