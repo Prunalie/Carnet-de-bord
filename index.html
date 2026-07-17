@@ -435,6 +435,8 @@ function ensureStateFields() {
       if (!seen.has(key)) { seen.add(key); state.masterIngredients.push({id:i.id,name:i.name,type:'shopping',cat:i.cat,needToBuy:i.needToBuy||false}); }
     });
   }
+  // Migration des rayons vers state (personnalisables)
+  if (!state.ingredientCats) state.ingredientCats = JSON.parse(JSON.stringify(INITIAL_ingCats()));
   // S'assurer que chaque ingrédient a un rayon
   state.masterIngredients.forEach(i => { if (!i.cat) i.cat = 'autre'; });
   if (!state.dismissedItems) state.dismissedItems = {};
@@ -605,7 +607,8 @@ const SEASON_OPT = [{v:'printemps',l:'🌱 Printemps'},{v:'été',l:'☀️ Ét�
 const TAG_OPT = [{v:'végétarien',l:'🥦 Végétarien'},{v:'vegan',l:'🌿 Vegan'},{v:'four',l:'♨️ Four'},{v:'poêle',l:'🍳 Poêle'},{v:'casserole',l:'🥘 Casserole'},{v:'vapeur',l:'💨 Vapeur'},{v:'mijotage',l:'⏱️ Mijotage'},{v:'rapide',l:'⚡ Rapide'},{v:'sans cuisson',l:'🥗 Sans cuisson'}];
 const MEAL_OPT = [{v:'matin',l:'🌅 Matin'},{v:'midi',l:'☀️ Midi'},{v:'soir',l:'🌙 Soir'}];
 const MAISON_CATS = [{k:'salle-bain',l:'🛁 Salle de bain'},{k:'wc',l:'🚽 WC'},{k:'cuisine',l:'🍽️ Cuisine'},{k:'entretien',l:'🧹 Entretien'},{k:'autre',l:'📦 Autre'}];
-const INGREDIENT_CATS = [{k:'legumes',l:'🥦 Légumes & fruits'},{k:'viandes',l:'🥩 Viandes & poissons'},{k:'laitiers',l:'🥛 Produits laitiers'},{k:'epicerie',l:'🛒 Épicerie sèche'},{k:'conserves',l:'🥫 Conserves'},{k:'condiments',l:'🧄 Condiments & épices'},{k:'autre',l:'📦 Autre'}];
+const INITIAL_ingCats() = [{k:'legumes',l:'🥦 Légumes & fruits'},{k:'viandes',l:'🥩 Viandes & poissons'},{k:'laitiers',l:'🥛 Produits laitiers'},{k:'epicerie',l:'🛒 Épicerie sèche'},{k:'conserves',l:'🥫 Conserves'},{k:'condiments',l:'🧄 Condiments & épices'},{k:'autre',l:'📦 Autre'}];
+function ingCats() { return state.ingredientCats || INITIAL_ingCats(); }
 function recipeById(id) { return state.recipes.find(r => r.id===id); }
 function getOrCreatePlan(weekKey) {
   let plan = state.weeklyPlans.find(p => p.weekStart===weekKey);
@@ -1144,7 +1147,7 @@ function renderIngredients() {
 
   // Grouper par rayon
   const grouped = {};
-  INGREDIENT_CATS.forEach(c => { grouped[c.k] = []; });
+  ingCats().forEach(c => { grouped[c.k] = []; });
   items.forEach(item => { (grouped[item.cat||'autre'] || grouped['autre']).push(item); });
 
   const renderItem = item => {
@@ -1157,7 +1160,7 @@ function renderIngredients() {
     </div>`;
   };
 
-  const groupsHTML = INGREDIENT_CATS.map(cat => {
+  const groupsHTML = ingCats().map(cat => {
     const catItems = grouped[cat.k];
     if (!catItems.length) return '';
     return `<div class="ing-cat-group">
@@ -1167,9 +1170,12 @@ function renderIngredients() {
   }).join('');
 
   return `
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
     <h2 style="font-size:1.1rem;color:var(--green-dark)">🥕 Ingrédients & Placard</h2>
-    <button class="btn btn-sm btn-primary" onclick="openAddMasterIngredient('${_ingTab}')">+ Ajouter</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm btn-outline" onclick="openManageRayons()" title="Gérer les rayons">⚙️ Rayons</button>
+      <button class="btn btn-sm btn-primary" onclick="openAddMasterIngredient('${_ingTab}')">+ Ajouter</button>
+    </div>
   </div>
 
   <div class="seg-tabs">
@@ -1237,7 +1243,7 @@ function openAddMasterIngredient(defaultType, defaultCat) {
     </div>
     <div class="form-group"><label>Rayon</label>
       <select id="new-mi-cat">
-        ${INGREDIENT_CATS.map(c=>`<option value="${c.k}" ${(defaultCat||'autre')===c.k?'selected':''}>${c.l}</option>`).join('')}
+        ${ingCats().map(c=>`<option value="${c.k}" ${(defaultCat||'autre')===c.k?'selected':''}>${c.l}</option>`).join('')}
       </select>
     </div>
     <div class="form-group"><label>Type</label>
@@ -1260,7 +1266,7 @@ function openAddMasterIngredient(defaultType, defaultCat) {
     const warn = document.getElementById('mi-warn');
     if (found) {
       warn.style.display='block';
-      const catLabel = INGREDIENT_CATS.find(c=>c.k===found.cat)?.l || found.cat;
+      const catLabel = ingCats().find(c=>c.k===found.cat)?.l || found.cat;
       warn.textContent = `"${found.name}" existe déjà (${found.type==='pantry'?'Placard':'Ponctuel'} · ${catLabel}). Enregistrer mettra à jour rayon et type.`;
       document.getElementById('new-mi-cat').value = found.cat || 'autre';
       document.getElementById('new-mi-type').value = found.type;
@@ -1282,6 +1288,67 @@ function saveMasterIngredient() {
     state.masterIngredients.push({id:uid(), name, type, cat, needToBuy: type==='shopping'});
   }
   save(); closeModal(); renderMain();
+}
+
+// ── Gestion des rayons ────────────────────────────────────
+function openManageRayons() {
+  const renderRayonList = () => {
+    const cats = ingCats();
+    return cats.map(c => {
+      const count = (state.masterIngredients||[]).filter(i=>i.cat===c.k).length;
+      const isProtected = c.k === 'autre';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input type="text" value="${escHtml(c.l)}" onblur="renameRayon('${c.k}',this.value)" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:.9rem">
+        <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">${count} art.</span>
+        <button class="del-btn" ${isProtected?'disabled style="opacity:.35" title="Ce rayon est requis"':'onclick="deleteRayon(\''+c.k+'\')" title="Supprimer"'}>🗑</button>
+      </div>`;
+    }).join('');
+  };
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>⚙️ Gérer les rayons</h2>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:14px">Cliquez sur le nom pour le modifier. Les articles d'un rayon supprimé rejoignent "📦 Autre".</p>
+    <div id="rayon-list">${renderRayonList()}</div>
+    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <input type="text" id="new-rayon-name" placeholder="Ex: 🥐 Boulangerie…" style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem">
+      <button class="btn btn-primary" onclick="addRayon()">+ Ajouter</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-rayon-name')?.focus(), 100);
+}
+
+function renameRayon(k, newLabel) {
+  const label = newLabel.trim();
+  if (!label) return;
+  const cat = ingCats().find(c=>c.k===k);
+  if (cat) { cat.l = label; save(); }
+}
+
+function addRayon() {
+  const name = document.getElementById('new-rayon-name').value.trim();
+  if (!name) return;
+  if (!state.ingredientCats) state.ingredientCats = JSON.parse(JSON.stringify(INITIAL_INGREDIENT_CATS));
+  // Insérer avant "autre" (toujours en dernier)
+  const autreIdx = state.ingredientCats.findIndex(c=>c.k==='autre');
+  const entry = {k: uid(), l: name};
+  if (autreIdx >= 0) state.ingredientCats.splice(autreIdx, 0, entry);
+  else state.ingredientCats.push(entry);
+  save();
+  openManageRayons();
+}
+
+function deleteRayon(k) {
+  if (k === 'autre') return;
+  const count = (state.masterIngredients||[]).filter(i=>i.cat===k).length;
+  const label = ingCats().find(c=>c.k===k)?.l || k;
+  const msg = count > 0
+    ? `"${label}" contient ${count} ingrédient(s) qui seront déplacés vers "📦 Autre". Confirmer ?`
+    : `Supprimer le rayon "${label}" ?`;
+  if (!confirm(msg)) return;
+  (state.masterIngredients||[]).filter(i=>i.cat===k).forEach(i=>i.cat='autre');
+  state.ingredientCats = ingCats().filter(c=>c.k!==k);
+  save();
+  openManageRayons();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1417,9 +1484,9 @@ function renderShopping() {
 
   // ── Groupement par rayon ──────────────────────────────
   const byRayon = {};
-  INGREDIENT_CATS.forEach(c => byRayon[c.k] = []);
+  ingCats().forEach(c => byRayon[c.k] = []);
   allItems.forEach(it => (byRayon[it.cat]||byRayon['autre']).push(it));
-  INGREDIENT_CATS.forEach(c => byRayon[c.k].sort((a,b)=>a.name.localeCompare(b.name,'fr')));
+  ingCats().forEach(c => byRayon[c.k].sort((a,b)=>a.name.localeCompare(b.name,'fr')));
 
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
   const totalItems = allItems.length;
@@ -1466,7 +1533,7 @@ function renderShopping() {
     </div>` : '';
 
   // ── Rayons alimentaires ────────────────────────────────
-  const rayonHTML = INGREDIENT_CATS.map(cat => {
+  const rayonHTML = ingCats().map(cat => {
     const catItems = byRayon[cat.k];
     if (!catItems.length) return '';
     return `<div style="margin-bottom:14px">
