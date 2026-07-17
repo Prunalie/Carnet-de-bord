@@ -70,17 +70,41 @@ textarea{resize:vertical;min-height:80px}
 .modal{background:#fff;border-radius:var(--radius);width:100%;max-width:680px;max-height:90vh;overflow-y:auto;padding:28px;position:relative}
 .modal h2{font-size:1.2rem;margin-bottom:20px;color:var(--green-dark)}
 .modal-close{position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted)}
-/* PLANNER */
-.planner-grid{display:grid;grid-template-columns:80px repeat(7,1fr);gap:4px;font-size:.8rem}
-.planner-grid .day-header{text-align:center;padding:8px 4px;font-weight:700;color:var(--green-dark);background:var(--green-light);border-radius:var(--radius-sm)}
-.planner-grid .meal-label{display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-muted);font-size:.75rem;text-align:center}
-.meal-slot{background:var(--card);border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:6px;min-height:60px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;text-align:center}
-.meal-slot:hover{border-color:var(--green);background:var(--green-light)}
-.meal-slot.filled{border-style:solid;border-color:var(--green);background:var(--green-light);color:var(--green-dark);font-size:.75rem;font-weight:600;justify-content:space-between;align-items:flex-start;flex-direction:column}
-.meal-slot .slot-name{font-weight:600;font-size:.75rem;color:var(--green-dark)}
-.meal-slot .slot-remove{font-size:.7rem;color:var(--text-muted);cursor:pointer;align-self:flex-end}
-.meal-slot .slot-remove:hover{color:#B91C1C}
-.slot-empty-text{color:var(--text-muted);font-size:.72rem}
+/* PLANNER — day-cards */
+.planner-days{display:grid;grid-template-columns:1fr;gap:10px}
+.day-card{background:var(--card);border-radius:var(--radius-sm);box-shadow:var(--shadow);overflow:hidden}
+.day-card-header{background:var(--green);color:#fff;padding:8px 12px;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:space-between}
+.day-card-header.today{background:var(--amber);color:var(--green-dark)}
+.day-meal-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)}
+.day-meal-row:last-child{border-bottom:none}
+.day-meal-icon{font-size:1rem;width:22px;text-align:center;flex-shrink:0}
+.day-slot{flex:1;background:none;border:1.5px dashed var(--border);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:.8rem;color:var(--text-muted);text-align:left;transition:.15s;min-height:34px;display:flex;align-items:center;justify-content:space-between}
+.day-slot:hover{border-color:var(--green);background:var(--green-light)}
+.day-slot.filled{border-style:solid;border-color:var(--green);background:var(--green-light);color:var(--green-dark);font-weight:600}
+.day-slot .slot-x{color:var(--text-muted);font-size:.8rem;flex-shrink:0;padding-left:6px}
+.day-slot .slot-x:hover{color:#B91C1C}
+/* SIDEBAR (desktop) */
+#sidebar{display:none;position:fixed;left:0;top:0;bottom:0;width:200px;background:var(--green-dark);flex-direction:column;z-index:200;box-shadow:2px 0 8px rgba(0,0,0,.15)}
+.sidebar-logo{color:#fff;font-weight:700;font-size:1rem;padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap}
+.sidebar-logo span{font-size:1.2rem}
+#sidebar-nav button{display:flex;align-items:center;gap:10px;padding:12px 16px;background:none;border:none;border-left:3px solid transparent;color:rgba(255,255,255,.6);font-size:.88rem;cursor:pointer;width:100%;text-align:left;transition:.15s}
+#sidebar-nav button:hover{color:#fff;background:rgba(255,255,255,.05)}
+#sidebar-nav button.active{color:var(--amber);border-left-color:var(--amber);background:rgba(255,255,255,.06)}
+#sidebar-nav button .ni{font-size:1.1rem;width:22px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.12)}
+.sidebar-footer button{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:8px 14px;cursor:pointer;font-size:.83rem;font-weight:600;width:100%}
+/* RESPONSIVE */
+@media(min-width:768px){
+  #bottom-nav{display:none}
+  #header{display:none}
+  #sidebar{display:flex}
+  #main{margin-left:200px;max-width:none;padding:24px;padding-bottom:24px}
+  .home-grid{grid-template-columns:repeat(3,1fr)}
+  .planner-days{grid-template-columns:repeat(7,1fr)}
+}
+@media(max-width:767px){
+  .planner-days{grid-template-columns:1fr}
+}
 /* SHOPPING */
 .shop-section{margin-bottom:20px}
 .shop-section h3{font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid var(--green-light)}
@@ -90,7 +114,7 @@ textarea{resize:vertical;min-height:80px}
 .shop-item.checked label{text-decoration:line-through;color:var(--text-muted)}
 /* PROFILES */
 .profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:600px){.profile-grid{grid-template-columns:1fr}.planner-grid{grid-template-columns:60px repeat(7,1fr);font-size:.68rem}}
+@media(max-width:600px){.profile-grid{grid-template-columns:1fr}}
 .prefs-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .pref-chip{display:flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.78rem}
 .pref-chip.like{background:#DCFCE7;color:#166534}
@@ -127,6 +151,11 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 </style>
 </head>
 <body>
+<div id="sidebar">
+  <div class="sidebar-logo"><span>🍽️</span> Carnet de Bord</div>
+  <nav id="sidebar-nav"></nav>
+  <div class="sidebar-footer"><button onclick="toggleSync()">💾 Données</button></div>
+</div>
 <div id="header">
   <h1><span>🍽️</span> Carnet de Bord</h1>
   <button id="sync-btn" onclick="toggleSync()">💾 Données</button>
@@ -529,11 +558,13 @@ const NAV_TABS = [
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
 function renderNav() {
-  document.getElementById('bottom-nav').innerHTML = NAV_TABS.map(t =>
+  const btns = NAV_TABS.map(t =>
     `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">
       <span class="ni">${t.icon}</span><span>${t.label}</span>
     </button>`
   ).join('');
+  document.getElementById('bottom-nav').innerHTML = btns;
+  document.getElementById('sidebar-nav').innerHTML = btns;
 }
 function setTab(id) { activeTab = id; render(); }
 
@@ -857,29 +888,41 @@ function renderPlanner() {
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const weekKey = ws.toISOString().slice(0,10);
   const plan = getOrCreatePlan(weekKey);
-  let html = `
-  <div class="section-header"><h2>📅 Planning de la semaine</h2></div>
-  <div class="week-nav">
-    <button onclick="weekOffset--;render()">◀</button>
-    <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
-    <button onclick="weekOffset++;render()">▶</button>
-    <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="weekOffset=0;render()">Aujourd'hui</button>
-    <button class="btn btn-outline btn-sm" onclick="clearWeek('${weekKey}')">🗑 Effacer</button>
+  const today = new Date(); today.setHours(0,0,0,0);
+  const mealIcons = {matin:'🌅',midi:'☀️',soir:'🌙'};
+  const days = DAYS_K.map((dk, i) => {
+    const dt = new Date(ws); dt.setDate(dt.getDate()+i);
+    const isToday = dt.toDateString()===today.toDateString();
+    const label = DAYS[i] + ' ' + dt.getDate();
+    const meals = MEALS.map(m => {
+      const rid = plan.days[dk]?.[m.k];
+      const r = rid ? recipeById(rid) : null;
+      return `<div class="day-meal-row">
+        <span class="day-meal-icon">${mealIcons[m.k]}</span>
+        <button class="day-slot${r?' filled':''}" onclick="openRecipePicker('${weekKey}','${dk}','${m.k}')">
+          <span>${r ? escHtml(r.name) : '+'}</span>
+          ${r ? `<span class="slot-x" onclick="event.stopPropagation();clearSlot('${weekKey}','${dk}','${m.k}')">✕</span>` : ''}
+        </button>
+      </div>`;
+    }).join('');
+    return `<div class="day-card">
+      <div class="day-card-header${isToday?' today':''}">
+        ${isToday?'📍 ':''}${label}
+      </div>
+      ${meals}
+    </div>`;
+  }).join('');
+  return `
+  <div class="section-header"><h2>📅 Planning</h2>
+    <button class="btn btn-outline btn-sm" onclick="clearWeek('${weekKey}')">🗑 Semaine</button>
   </div>
-  <div style="overflow-x:auto"><div class="planner-grid">
-    <div></div>
-    ${DAYS.map((d,i)=>{const dt=new Date(ws);dt.setDate(dt.getDate()+i);const isToday=dt.toDateString()===new Date().toDateString();return `<div class="day-header" ${isToday?'style="background:var(--green);color:#fff"':''}>${d}<br><span style="font-weight:400;font-size:.72rem;${isToday?'color:rgba(255,255,255,.85)':''}">${fmtDate(dt)}</span></div>`}).join('')}
-    ${MEALS.map(m=>`
-      <div class="meal-label">${m.label}</div>
-      ${DAYS_K.map(d=>{
-        const rid = plan.days[d]?.[m.k];
-        const r = rid ? recipeById(rid) : null;
-        return `<div class="meal-slot ${r?'filled':''}" onclick="openRecipePicker('${weekKey}','${d}','${m.k}')">
-          ${r ? `<span class="slot-name">${escHtml(r.name)}</span><span class="slot-remove" onclick="event.stopPropagation();clearSlot('${weekKey}','${d}','${m.k}')">✕</span>` : '<span class="slot-empty-text">+ Ajouter</span>'}
-        </div>`;
-      }).join('')}`).join('')}
-  </div></div>`;
-  return html;
+  <div class="week-nav">
+    <button onclick="weekOffset--;render()" style="font-size:1.2rem;padding:6px 16px">◀</button>
+    <span class="week-label" style="flex:1;text-align:center">${fmtDate(ws)} — ${fmtDate(we)}</span>
+    <button onclick="weekOffset++;render()" style="font-size:1.2rem;padding:6px 16px">▶</button>
+    <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Auj.</button>
+  </div>
+  <div class="planner-days">${days}</div>`;
 }
 function clearWeek(weekKey) {
   if (!confirm('Effacer tout le planning de cette semaine ?')) return;
