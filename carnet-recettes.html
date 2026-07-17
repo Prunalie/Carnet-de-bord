@@ -807,17 +807,17 @@ function clearSlot(weekKey, day, meal) {
 let _pickerTarget = null;
 function openRecipePicker(weekKey, day, meal) {
   _pickerTarget = {weekKey, day, meal};
-  const mealRecipes = state.recipes.filter(r=>r.mealType.includes(meal));
+  const allRecipes = [...state.recipes].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const pc = document.getElementById('picker-content');
   pc.innerHTML = `
     <button class="modal-close" onclick="closePicker()">×</button>
     <h2>Choisir une recette · ${DAYS.find((_,i)=>DAYS_K[i]===day)||day} ${meal}</h2>
-    <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)">
+    <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="recipe-picker" id="recipe-picker-list">
-      ${mealRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}')">
+      ${allRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}')">
         <div><div class="pi-name">${escHtml(r.name)}</div><div class="pi-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers. · ${r.tags.slice(0,3).join(', ')}</div></div>
       </div>`).join('')}
-      ${mealRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette pour ce type de repas. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
+      ${allRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette disponible. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
     </div>`;
   document.getElementById('picker-overlay').classList.add('open');
 }
