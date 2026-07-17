@@ -388,6 +388,7 @@ function ensureStateFields() {
   if (!state.maisonItems) state.maisonItems = JSON.parse(JSON.stringify(INITIAL_DATA.maisonItems));
   if (!state.ingredientItems) state.ingredientItems = JSON.parse(JSON.stringify(INITIAL_DATA.ingredientItems));
   if (!state.pantryItems) state.pantryItems = JSON.parse(JSON.stringify(INITIAL_DATA.pantryItems));
+  if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.shoppingHistory) state.shoppingHistory = [];
 }
 
@@ -1216,11 +1217,14 @@ function renderShopping() {
       all[norm].entries.push({q:ing.q, u:ing.u, recipe:r.name});
     });
   });
-  const items = Object.values(all).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const checkedKey = `checked-${weekKey}`;
   if (!state.checkedItems) state.checkedItems = {};
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey] = {};
   const checked = state.checkedItems[checkedKey];
+  if (!state.dismissedItems) state.dismissedItems = {};
+  if (!state.dismissedItems[checkedKey]) state.dismissedItems[checkedKey] = {};
+  const dismissed = state.dismissedItems[checkedKey];
+  const items = Object.values(all).filter(it=>!dismissed[it.name.toLowerCase().trim()]).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
   const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy);
@@ -1293,6 +1297,7 @@ function renderShopping() {
     return `<div class="shop-item ${isChecked?'checked':''}">
       <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
       <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b> <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span></label>
+      <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${key}')" title="On en a déjà — retirer sans noter dans l'historique">🗑</button>
     </div>`;
   }).join('')}
   </div>
@@ -1314,6 +1319,12 @@ function toggleCheckLabel(checkedKey, key) {
   save(); renderMain();
 }
 function uncheckAll(checkedKey) { state.checkedItems[checkedKey]={}; save(); renderMain(); }
+function dismissShoppingItem(checkedKey, key) {
+  if (!state.dismissedItems) state.dismissedItems = {};
+  if (!state.dismissedItems[checkedKey]) state.dismissedItems[checkedKey] = {};
+  state.dismissedItems[checkedKey][key] = true;
+  save(); renderMain();
+}
 
 // ═══════════════════════════════════════════════════════
 // MODAL
