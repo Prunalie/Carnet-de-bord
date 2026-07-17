@@ -345,6 +345,33 @@ const INITIAL_DATA = {
     {id:'h22',name:'Produit multi-surfaces',cat:'entretien',needToBuy:false},
     {id:'h23',name:'Désodorisant',cat:'entretien',needToBuy:false},
     {id:'h24',name:'Sacs aspirateur',cat:'entretien',needToBuy:false},
+  ],
+  pantryItems: [
+    {id:'py1', name:'Sel', needToBuy:false},
+    {id:'py2', name:'Poivre', needToBuy:false},
+    {id:'py3', name:'Beurre', needToBuy:false},
+    {id:'py4', name:'Huile d\'olive', needToBuy:false},
+    {id:'py5', name:'Huile de tournesol', needToBuy:false},
+    {id:'py6', name:'Farine', needToBuy:false},
+    {id:'py7', name:'Sucre', needToBuy:false},
+    {id:'py8', name:'Levure chimique', needToBuy:false},
+    {id:'py9', name:'Bicarbonate', needToBuy:false},
+    {id:'py10',name:'Vinaigre', needToBuy:false},
+    {id:'py11',name:'Moutarde', needToBuy:false},
+    {id:'py12',name:'Ail', needToBuy:false},
+    {id:'py13',name:'Oignon', needToBuy:false},
+    {id:'py14',name:'Herbes de Provence', needToBuy:false},
+    {id:'py15',name:'Thym', needToBuy:false},
+    {id:'py16',name:'Laurier', needToBuy:false},
+    {id:'py17',name:'Persil', needToBuy:false},
+    {id:'py18',name:'Concentré de tomates', needToBuy:false},
+    {id:'py19',name:'Bouillon de légumes', needToBuy:false},
+    {id:'py20',name:'Bouillon de poulet', needToBuy:false},
+    {id:'py21',name:'Maïzena', needToBuy:false},
+    {id:'py22',name:'Sauce soja', needToBuy:false},
+    {id:'py23',name:'Paprika', needToBuy:false},
+    {id:'py24',name:'Cumin', needToBuy:false},
+    {id:'py25',name:'Sucre glace', needToBuy:false},
   ]
 };
 
@@ -360,7 +387,24 @@ function ensureStateFields() {
   if (!state.checkedItems) state.checkedItems = {};
   if (!state.maisonItems) state.maisonItems = JSON.parse(JSON.stringify(INITIAL_DATA.maisonItems));
   if (!state.ingredientItems) state.ingredientItems = JSON.parse(JSON.stringify(INITIAL_DATA.ingredientItems));
+  if (!state.pantryItems) state.pantryItems = JSON.parse(JSON.stringify(INITIAL_DATA.pantryItems));
   if (!state.shoppingHistory) state.shoppingHistory = [];
+}
+
+function normIngName(n) { return (n||'').toLowerCase().trim().replace(/s$/,''); }
+function sumQty(entries) {
+  const byUnit = {};
+  entries.forEach(({q,u}) => {
+    const unit = (u||'').trim();
+    const num = parseFloat((q||'').toString().replace(',','.'));
+    if (!byUnit[unit]) byUnit[unit] = {sum:0, raw:q};
+    if (!isNaN(num)) byUnit[unit].sum += num; else byUnit[unit].sum = null;
+  });
+  return Object.entries(byUnit).map(([unit, {sum, raw}]) => {
+    if (sum === null) return unit ? `${raw} ${unit}` : raw;
+    const s = sum % 1 === 0 ? sum : parseFloat(sum.toFixed(1));
+    return unit ? `${s} ${unit}` : `${s}`;
+  }).join(' + ');
 }
 
 function loadFromStorage() {
@@ -926,32 +970,98 @@ function renderHistorySection() {
 }
 
 // ═══════════════════════════════════════════════════════
-// INGRÉDIENTS MANUELS
+// PLACARD & INGRÉDIENTS
 // ═══════════════════════════════════════════════════════
 function renderIngredients() {
   if (!state.ingredientItems) state.ingredientItems = [];
-  const toBuyCount = state.ingredientItems.filter(i=>i.needToBuy).length;
+  if (!state.pantryItems) state.pantryItems = [];
+  const ingToBuy = state.ingredientItems.filter(i=>i.needToBuy).length;
+  const pantryToBuy = state.pantryItems.filter(i=>i.needToBuy).length;
+  const badge = n => n>0 ? `<span style="font-size:.75rem;background:var(--green);color:#fff;border-radius:20px;padding:1px 8px;margin-left:6px">${n}</span>` : '';
+  const sortedPantry = [...state.pantryItems].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   return `
-  <div class="section-header">
-    <h2>🥕 Ingrédients ${toBuyCount>0?`<span style="font-size:.8rem;background:var(--green);color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px">${toBuyCount} à acheter</span>`:''}</h2>
-    <button class="btn btn-primary" onclick="openAddIngredientItem()">+ Ajouter</button>
+  <h2 style="font-size:1.2rem;color:var(--green-dark);margin-bottom:16px">🥕 Ingrédients & Placard</h2>
+
+  <!-- PLACARD -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--amber-light)">
+      <h3 style="font-weight:700;color:var(--green-dark)">🫙 Mon placard ${badge(pantryToBuy)}</h3>
+      <button class="btn btn-sm btn-outline" onclick="openAddPantryItem()">+ Ajouter</button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px">Ces ingrédients sont toujours chez vous. Cochez ceux à racheter → ils apparaissent dans les courses. Les ingrédients du placard présents dans vos recettes ne sont pas mis automatiquement dans la liste.</p>
+    ${sortedPantry.map(item=>`
+    <div class="shop-item" style="${item.needToBuy?'background:var(--amber-light);border-radius:6px;padding:3px 6px;':''}">
+      <input type="checkbox" ${item.needToBuy?'checked':''} onchange="togglePantryNeedToBuy('${item.id}',this.checked)" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+      <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="togglePantryNeedToBuy('${item.id}',${!item.needToBuy})">
+        ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
+      </label>
+      <button class="del-btn" onclick="deletePantryItem('${item.id}')" title="Retirer du placard">🗑</button>
+    </div>`).join('')}
   </div>
-  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">Cochez les ingrédients à acheter — ils s'ajoutent automatiquement aux courses.</p>
+
+  <!-- INGRÉDIENTS PONCTUELS -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h3 style="font-weight:700;color:var(--green-dark)">🛒 Ingrédients ponctuels ${badge(ingToBuy)}</h3>
+    <button class="btn btn-sm btn-primary" onclick="openAddIngredientItem()">+ Ajouter</button>
+  </div>
+  <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">Cochez pour ajouter aux courses. Ces articles ne sont pas liés au placard ni aux recettes.</p>
   ${INGREDIENT_CATS.map(cat=>{
     const items = state.ingredientItems.filter(i=>i.cat===cat.k);
     if (!items.length) return '';
-    return `<div class="card" style="margin-bottom:12px">
-      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">${cat.l}</h3>
+    return `<div class="card" style="margin-bottom:10px">
+      <h4 style="font-weight:700;color:var(--green-dark);margin-bottom:8px;font-size:.88rem">${cat.l}</h4>
       ${items.map(item=>`
-      <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:4px 6px;':''}">
+      <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:3px 6px;':''}">
         <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleIngredientItem('${item.id}',this.checked)" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
-        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'};color:${item.needToBuy?'var(--green-dark)':'inherit'}" onclick="toggleIngredientItem('${item.id}',${!item.needToBuy})">
+        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleIngredientItem('${item.id}',${!item.needToBuy})">
           ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--green)">→ courses</span>':''}
         </label>
         <button class="del-btn" onclick="deleteIngredientItem('${item.id}')" title="Supprimer">🗑</button>
       </div>`).join('')}
     </div>`;
   }).join('')}`;
+}
+
+function togglePantryNeedToBuy(id, val) {
+  const item = (state.pantryItems||[]).find(i=>i.id===id);
+  if (!item) return;
+  item.needToBuy = val;
+  if (val) addToHistory(item.name, 'added', 'placard');
+  save(); renderMain();
+}
+function buyPantryItem(id) {
+  const item = (state.pantryItems||[]).find(i=>i.id===id);
+  if (!item) return;
+  addToHistory(item.name, 'bought', 'placard');
+  item.needToBuy = false;
+  save(); renderMain();
+}
+function deletePantryItem(id) {
+  if (!confirm('Retirer cet ingrédient du placard ?')) return;
+  state.pantryItems = state.pantryItems.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+function openAddPantryItem() {
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Ajouter au placard</h2>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px">Un ingrédient du placard ne va pas automatiquement dans les courses quand il est utilisé dans une recette.</p>
+    <div class="form-group"><label>Nom de l'ingrédient</label>
+      <input type="text" id="new-pantry-name" placeholder="Ex: Curcuma…">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="savePantryItem()">Ajouter au placard</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-pantry-name')?.focus(),100);
+}
+function savePantryItem() {
+  const name = document.getElementById('new-pantry-name').value.trim();
+  if (!name) { alert('Le nom est requis.'); return; }
+  if (!state.pantryItems) state.pantryItems = [];
+  state.pantryItems.push({id:uid(), name, needToBuy:false});
+  save(); closeModal(); renderMain();
 }
 
 function toggleIngredientItem(id, val) {
@@ -1094,14 +1204,16 @@ function renderShopping() {
   // Collecter tous les IDs de recettes de la semaine
   const recipeIds = new Set();
   if (plan) Object.values(plan.days).forEach(day => Object.values(day).forEach(id=>recipeIds.add(id)));
-  // Agréger les ingrédients
+  // Agréger les ingrédients (hors placard non demandé)
   const all = {};
   recipeIds.forEach(id => {
     const r = recipeById(id); if (!r) return;
     r.ingredients.forEach(ing => {
-      const key = ing.n.toLowerCase().trim();
-      if (!all[key]) all[key] = {name:ing.n, entries:[]};
-      all[key].entries.push({q:ing.q, u:ing.u, recipe:r.name});
+      const norm = normIngName(ing.n);
+      const pantry = (state.pantryItems||[]).find(p => normIngName(p.name)===norm);
+      if (pantry && !pantry.needToBuy) return; // dans le placard, pas besoin
+      if (!all[norm]) all[norm] = {name:ing.n, entries:[], isPantry:!!pantry};
+      all[norm].entries.push({q:ing.q, u:ing.u, recipe:r.name});
     });
   });
   const items = Object.values(all).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
@@ -1112,6 +1224,7 @@ function renderShopping() {
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
   const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy);
+  const pantryToBuy = (state.pantryItems||[]).filter(i=>i.needToBuy);
   const weekNav = `<div class="week-nav">
     <button onclick="weekOffset--;render()">◀</button>
     <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
@@ -1136,13 +1249,23 @@ function renderShopping() {
         <label style="cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
       </div>`).join('')}
     </div>` : '';
+  const pantrySection = pantryToBuy.length>0 ? `
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🫙 Placard à racheter</h3>
+      ${pantryToBuy.map(item=>`
+      <div class="shop-item">
+        <input type="checkbox" onchange="buyPantryItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="cursor:pointer" onclick="buyPantryItem('${item.id}')">${escHtml(item.name)}</label>
+      </div>`).join('')}
+    </div>` : '';
 
   if (items.length===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
     ${weekNav}
+    ${pantrySection}
     ${ingSection}
     ${maisonSection}
-    ${maisonToBuy.length===0&&ingToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
+    ${maisonToBuy.length===0&&ingToBuy.length===0&&pantryToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
     ${renderHistorySection()}
   `;
   const doneCount = items.filter(it=>checked[it.name.toLowerCase().trim()]).length;
@@ -1155,6 +1278,7 @@ function renderShopping() {
       <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
     </div>
   </div>
+  ${pantrySection}
   ${ingSection}
   ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between">
@@ -1165,7 +1289,7 @@ function renderShopping() {
   ${items.map(it => {
     const key = it.name.toLowerCase().trim();
     const isChecked = !!checked[key];
-    const summary = it.entries.map(e=>`${e.q} ${e.u}`).join(' + ');
+    const summary = sumQty(it.entries);
     return `<div class="shop-item ${isChecked?'checked':''}">
       <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
       <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b> <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span></label>

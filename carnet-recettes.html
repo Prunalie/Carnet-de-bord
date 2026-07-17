@@ -17,17 +17,25 @@
 }
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 /* HEADER */
-#header{background:var(--green-dark);color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-#header h1{font-size:1.2rem;font-weight:700;padding:14px 0;white-space:nowrap}
-#header h1 span{font-size:1.4rem}
-nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
-nav button{background:none;border:none;color:rgba(255,255,255,.7);padding:14px 16px;cursor:pointer;font-size:.9rem;border-bottom:3px solid transparent;transition:.2s;white-space:nowrap}
-nav button:hover{color:#fff}
-nav button.active{color:#fff;border-bottom-color:var(--amber)}
-#sync-btn{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap;margin:8px 0}
+#header{background:var(--green-dark);color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:50px;position:sticky;top:0;z-index:150}
+#header h1{font-size:1rem;font-weight:700;white-space:nowrap}
+#header h1 span{font-size:1.2rem}
+#sync-btn{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.8rem;font-weight:600;white-space:nowrap}
 #sync-btn:hover{background:#d4a55a}
+/* BOTTOM NAV */
+#bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--green-dark);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 10px rgba(0,0,0,.2)}
+#bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px 8px;background:none;border:none;border-top:2px solid transparent;color:rgba(255,255,255,.5);font-size:.55rem;cursor:pointer;gap:2px;min-height:56px;transition:.15s}
+#bottom-nav button .ni{font-size:1.35rem;line-height:1}
+#bottom-nav button.active{color:var(--amber);border-top-color:var(--amber)}
 /* MAIN */
-#main{max-width:1100px;margin:0 auto;padding:24px 16px}
+#main{max-width:1100px;margin:0 auto;padding:16px 16px 80px}
+/* HOME */
+.home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.home-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 12px;cursor:pointer;border:2px solid transparent;transition:.2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.home-card:active{border-color:var(--green);background:var(--green-light)}
+.home-card .hc-icon{font-size:2rem}
+.home-card .hc-label{font-weight:700;color:var(--green-dark);font-size:.9rem}
+.home-card .hc-stat{font-size:.75rem;color:var(--text-muted)}
 /* CARDS */
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
@@ -120,11 +128,11 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 </head>
 <body>
 <div id="header">
-  <h1><span>🍽️</span> Carnet de Recettes</h1>
-  <nav id="nav"></nav>
+  <h1><span>🍽️</span> Carnet de Bord</h1>
   <button id="sync-btn" onclick="toggleSync()">💾 Données</button>
 </div>
 <div id="main"></div>
+<nav id="bottom-nav"></nav>
 
 <!-- Modals -->
 <div class="overlay" id="modal-overlay"><div class="modal" id="modal-content"></div></div>
@@ -337,6 +345,33 @@ const INITIAL_DATA = {
     {id:'h22',name:'Produit multi-surfaces',cat:'entretien',needToBuy:false},
     {id:'h23',name:'Désodorisant',cat:'entretien',needToBuy:false},
     {id:'h24',name:'Sacs aspirateur',cat:'entretien',needToBuy:false},
+  ],
+  pantryItems: [
+    {id:'py1', name:'Sel', needToBuy:false},
+    {id:'py2', name:'Poivre', needToBuy:false},
+    {id:'py3', name:'Beurre', needToBuy:false},
+    {id:'py4', name:'Huile d\'olive', needToBuy:false},
+    {id:'py5', name:'Huile de tournesol', needToBuy:false},
+    {id:'py6', name:'Farine', needToBuy:false},
+    {id:'py7', name:'Sucre', needToBuy:false},
+    {id:'py8', name:'Levure chimique', needToBuy:false},
+    {id:'py9', name:'Bicarbonate', needToBuy:false},
+    {id:'py10',name:'Vinaigre', needToBuy:false},
+    {id:'py11',name:'Moutarde', needToBuy:false},
+    {id:'py12',name:'Ail', needToBuy:false},
+    {id:'py13',name:'Oignon', needToBuy:false},
+    {id:'py14',name:'Herbes de Provence', needToBuy:false},
+    {id:'py15',name:'Thym', needToBuy:false},
+    {id:'py16',name:'Laurier', needToBuy:false},
+    {id:'py17',name:'Persil', needToBuy:false},
+    {id:'py18',name:'Concentré de tomates', needToBuy:false},
+    {id:'py19',name:'Bouillon de légumes', needToBuy:false},
+    {id:'py20',name:'Bouillon de poulet', needToBuy:false},
+    {id:'py21',name:'Maïzena', needToBuy:false},
+    {id:'py22',name:'Sauce soja', needToBuy:false},
+    {id:'py23',name:'Paprika', needToBuy:false},
+    {id:'py24',name:'Cumin', needToBuy:false},
+    {id:'py25',name:'Sucre glace', needToBuy:false},
   ]
 };
 
@@ -352,7 +387,24 @@ function ensureStateFields() {
   if (!state.checkedItems) state.checkedItems = {};
   if (!state.maisonItems) state.maisonItems = JSON.parse(JSON.stringify(INITIAL_DATA.maisonItems));
   if (!state.ingredientItems) state.ingredientItems = JSON.parse(JSON.stringify(INITIAL_DATA.ingredientItems));
+  if (!state.pantryItems) state.pantryItems = JSON.parse(JSON.stringify(INITIAL_DATA.pantryItems));
   if (!state.shoppingHistory) state.shoppingHistory = [];
+}
+
+function normIngName(n) { return (n||'').toLowerCase().trim().replace(/s$/,''); }
+function sumQty(entries) {
+  const byUnit = {};
+  entries.forEach(({q,u}) => {
+    const unit = (u||'').trim();
+    const num = parseFloat((q||'').toString().replace(',','.'));
+    if (!byUnit[unit]) byUnit[unit] = {sum:0, raw:q};
+    if (!isNaN(num)) byUnit[unit].sum += num; else byUnit[unit].sum = null;
+  });
+  return Object.entries(byUnit).map(([unit, {sum, raw}]) => {
+    if (sum === null) return unit ? `${raw} ${unit}` : raw;
+    const s = sum % 1 === 0 ? sum : parseFloat(sum.toFixed(1));
+    return unit ? `${s} ${unit}` : `${s}`;
+  }).join(' + ');
 }
 
 function loadFromStorage() {
@@ -462,13 +514,24 @@ function toggleSync() {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
 const TABS = [{id:'profiles',icon:'👤',label:'Profils'},{id:'recipes',icon:'🍽️',label:'Recettes'},{id:'planner',icon:'📅',label:'Planning'},{id:'shopping',icon:'🛒',label:'Courses'},{id:'ingredients',icon:'🥕',label:'Ingrédients'},{id:'maison',icon:'🏠',label:'Maison'}];
-let activeTab = 'recipes';
+let activeTab = 'home';
 let activeFilters = {mealType:null, season:null, tag:null, search:''};
-let weekOffset = 0; // 0 = semaine courante
+let weekOffset = 0;
 
+const NAV_TABS = [
+  {id:'home',      icon:'🏡', label:'Accueil'},
+  {id:'recipes',   icon:'🍽️', label:'Recettes'},
+  {id:'planner',   icon:'📅', label:'Planning'},
+  {id:'shopping',  icon:'🛒', label:'Courses'},
+  {id:'ingredients',icon:'🥕',label:'Ingréd.'},
+  {id:'maison',    icon:'🧴', label:'Maison'},
+  {id:'profiles',  icon:'👤', label:'Profils'},
+];
 function renderNav() {
-  document.getElementById('nav').innerHTML = TABS.map(t =>
-    `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">${t.icon} ${t.label}</button>`
+  document.getElementById('bottom-nav').innerHTML = NAV_TABS.map(t =>
+    `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">
+      <span class="ni">${t.icon}</span><span>${t.label}</span>
+    </button>`
   ).join('');
 }
 function setTab(id) { activeTab = id; render(); }
@@ -504,12 +567,46 @@ function getOrCreatePlan(weekKey) {
 function render() {
   renderNav();
   const main = document.getElementById('main');
-  if (activeTab==='profiles') main.innerHTML = renderProfiles();
+  if (activeTab==='home') main.innerHTML = renderHome();
+  else if (activeTab==='profiles') main.innerHTML = renderProfiles();
   else if (activeTab==='recipes') main.innerHTML = renderRecipes();
   else if (activeTab==='planner') main.innerHTML = renderPlanner();
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
   else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
   else if (activeTab==='maison') main.innerHTML = renderMaison();
+}
+function renderHome() {
+  const p1 = state.profiles?.[0], p2 = state.profiles?.[1];
+  const ws = getWeekStart(0);
+  const weekKey = ws.toISOString().slice(0,10);
+  const plan = (state.weeklyPlans||[]).find(p=>p.weekStart===weekKey);
+  const plannedCount = plan ? Object.values(plan.days||{}).reduce((n,d)=>n+Object.keys(d).length,0) : 0;
+  const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy).length;
+  const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy).length;
+  const totalToBuy = ingToBuy + maisonToBuy;
+  const cards = [
+    {tab:'recipes',    icon:'🍽️', label:'Recettes',    stat:`${state.recipes.length} recettes`},
+    {tab:'planner',    icon:'📅', label:'Planning',    stat:`${plannedCount} repas cette semaine`},
+    {tab:'shopping',   icon:'🛒', label:'Courses',     stat:`${totalToBuy} article${totalToBuy!==1?'s':''} à acheter`},
+    {tab:'ingredients',icon:'🥕', label:'Ingrédients', stat:`${(state.ingredientItems||[]).length} ingrédients`},
+    {tab:'maison',     icon:'🧴', label:'Maison',      stat:`${(state.maisonItems||[]).length} produits`},
+    {tab:'profiles',   icon:'👤', label:'Profils',     stat:`${p1?.name||'Profil 1'} & ${p2?.name||'Profil 2'}`},
+  ];
+  return `
+  <div class="section-header" style="margin-bottom:20px">
+    <h2>👋 Bonjour !</h2>
+  </div>
+  <div class="home-grid">
+    ${cards.map(c=>`<div class="home-card" onclick="setTab('${c.tab}')">
+      <div class="hc-icon">${c.icon}</div>
+      <div class="hc-label">${c.label}</div>
+      <div class="hc-stat">${c.stat}</div>
+    </div>`).join('')}
+  </div>
+  <div class="card" style="margin-top:4px;min-height:110px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-muted)">
+    <div style="font-size:2.2rem">📊</div>
+    <div style="font-size:.85rem">Graphiques à venir…</div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -625,7 +722,8 @@ function toggleFilter(key, val) { activeFilters[key] = activeFilters[key]===val?
 function clearFilters() { activeFilters={mealType:null,season:null,tag:null,search:''}; renderMain(); }
 function renderMain() {
   const m = document.getElementById('main');
-  if (activeTab==='recipes') m.innerHTML=renderRecipes();
+  if (activeTab==='home') m.innerHTML=renderHome();
+  else if (activeTab==='recipes') m.innerHTML=renderRecipes();
   else if (activeTab==='profiles') m.innerHTML=renderProfiles();
   else if (activeTab==='planner') m.innerHTML=renderPlanner();
   else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
@@ -872,32 +970,98 @@ function renderHistorySection() {
 }
 
 // ═══════════════════════════════════════════════════════
-// INGRÉDIENTS MANUELS
+// PLACARD & INGRÉDIENTS
 // ═══════════════════════════════════════════════════════
 function renderIngredients() {
   if (!state.ingredientItems) state.ingredientItems = [];
-  const toBuyCount = state.ingredientItems.filter(i=>i.needToBuy).length;
+  if (!state.pantryItems) state.pantryItems = [];
+  const ingToBuy = state.ingredientItems.filter(i=>i.needToBuy).length;
+  const pantryToBuy = state.pantryItems.filter(i=>i.needToBuy).length;
+  const badge = n => n>0 ? `<span style="font-size:.75rem;background:var(--green);color:#fff;border-radius:20px;padding:1px 8px;margin-left:6px">${n}</span>` : '';
+  const sortedPantry = [...state.pantryItems].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   return `
-  <div class="section-header">
-    <h2>🥕 Ingrédients ${toBuyCount>0?`<span style="font-size:.8rem;background:var(--green);color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px">${toBuyCount} à acheter</span>`:''}</h2>
-    <button class="btn btn-primary" onclick="openAddIngredientItem()">+ Ajouter</button>
+  <h2 style="font-size:1.2rem;color:var(--green-dark);margin-bottom:16px">🥕 Ingrédients & Placard</h2>
+
+  <!-- PLACARD -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--amber-light)">
+      <h3 style="font-weight:700;color:var(--green-dark)">🫙 Mon placard ${badge(pantryToBuy)}</h3>
+      <button class="btn btn-sm btn-outline" onclick="openAddPantryItem()">+ Ajouter</button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px">Ces ingrédients sont toujours chez vous. Cochez ceux à racheter → ils apparaissent dans les courses. Les ingrédients du placard présents dans vos recettes ne sont pas mis automatiquement dans la liste.</p>
+    ${sortedPantry.map(item=>`
+    <div class="shop-item" style="${item.needToBuy?'background:var(--amber-light);border-radius:6px;padding:3px 6px;':''}">
+      <input type="checkbox" ${item.needToBuy?'checked':''} onchange="togglePantryNeedToBuy('${item.id}',this.checked)" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+      <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="togglePantryNeedToBuy('${item.id}',${!item.needToBuy})">
+        ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--amber)">→ courses</span>':''}
+      </label>
+      <button class="del-btn" onclick="deletePantryItem('${item.id}')" title="Retirer du placard">🗑</button>
+    </div>`).join('')}
   </div>
-  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">Cochez les ingrédients à acheter — ils s'ajoutent automatiquement aux courses.</p>
+
+  <!-- INGRÉDIENTS PONCTUELS -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h3 style="font-weight:700;color:var(--green-dark)">🛒 Ingrédients ponctuels ${badge(ingToBuy)}</h3>
+    <button class="btn btn-sm btn-primary" onclick="openAddIngredientItem()">+ Ajouter</button>
+  </div>
+  <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">Cochez pour ajouter aux courses. Ces articles ne sont pas liés au placard ni aux recettes.</p>
   ${INGREDIENT_CATS.map(cat=>{
     const items = state.ingredientItems.filter(i=>i.cat===cat.k);
     if (!items.length) return '';
-    return `<div class="card" style="margin-bottom:12px">
-      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--green-light)">${cat.l}</h3>
+    return `<div class="card" style="margin-bottom:10px">
+      <h4 style="font-weight:700;color:var(--green-dark);margin-bottom:8px;font-size:.88rem">${cat.l}</h4>
       ${items.map(item=>`
-      <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:4px 6px;':''}">
+      <div class="shop-item" style="${item.needToBuy?'background:var(--green-light);border-radius:6px;padding:3px 6px;':''}">
         <input type="checkbox" ${item.needToBuy?'checked':''} onchange="toggleIngredientItem('${item.id}',this.checked)" style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
-        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'};color:${item.needToBuy?'var(--green-dark)':'inherit'}" onclick="toggleIngredientItem('${item.id}',${!item.needToBuy})">
+        <label style="flex:1;cursor:pointer;font-weight:${item.needToBuy?'700':'400'}" onclick="toggleIngredientItem('${item.id}',${!item.needToBuy})">
           ${escHtml(item.name)}${item.needToBuy?' <span style="font-size:.72rem;color:var(--green)">→ courses</span>':''}
         </label>
         <button class="del-btn" onclick="deleteIngredientItem('${item.id}')" title="Supprimer">🗑</button>
       </div>`).join('')}
     </div>`;
   }).join('')}`;
+}
+
+function togglePantryNeedToBuy(id, val) {
+  const item = (state.pantryItems||[]).find(i=>i.id===id);
+  if (!item) return;
+  item.needToBuy = val;
+  if (val) addToHistory(item.name, 'added', 'placard');
+  save(); renderMain();
+}
+function buyPantryItem(id) {
+  const item = (state.pantryItems||[]).find(i=>i.id===id);
+  if (!item) return;
+  addToHistory(item.name, 'bought', 'placard');
+  item.needToBuy = false;
+  save(); renderMain();
+}
+function deletePantryItem(id) {
+  if (!confirm('Retirer cet ingrédient du placard ?')) return;
+  state.pantryItems = state.pantryItems.filter(i=>i.id!==id);
+  save(); renderMain();
+}
+function openAddPantryItem() {
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Ajouter au placard</h2>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px">Un ingrédient du placard ne va pas automatiquement dans les courses quand il est utilisé dans une recette.</p>
+    <div class="form-group"><label>Nom de l'ingrédient</label>
+      <input type="text" id="new-pantry-name" placeholder="Ex: Curcuma…">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="savePantryItem()">Ajouter au placard</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('new-pantry-name')?.focus(),100);
+}
+function savePantryItem() {
+  const name = document.getElementById('new-pantry-name').value.trim();
+  if (!name) { alert('Le nom est requis.'); return; }
+  if (!state.pantryItems) state.pantryItems = [];
+  state.pantryItems.push({id:uid(), name, needToBuy:false});
+  save(); closeModal(); renderMain();
 }
 
 function toggleIngredientItem(id, val) {
@@ -1040,14 +1204,16 @@ function renderShopping() {
   // Collecter tous les IDs de recettes de la semaine
   const recipeIds = new Set();
   if (plan) Object.values(plan.days).forEach(day => Object.values(day).forEach(id=>recipeIds.add(id)));
-  // Agréger les ingrédients
+  // Agréger les ingrédients (hors placard non demandé)
   const all = {};
   recipeIds.forEach(id => {
     const r = recipeById(id); if (!r) return;
     r.ingredients.forEach(ing => {
-      const key = ing.n.toLowerCase().trim();
-      if (!all[key]) all[key] = {name:ing.n, entries:[]};
-      all[key].entries.push({q:ing.q, u:ing.u, recipe:r.name});
+      const norm = normIngName(ing.n);
+      const pantry = (state.pantryItems||[]).find(p => normIngName(p.name)===norm);
+      if (pantry && !pantry.needToBuy) return; // dans le placard, pas besoin
+      if (!all[norm]) all[norm] = {name:ing.n, entries:[], isPantry:!!pantry};
+      all[norm].entries.push({q:ing.q, u:ing.u, recipe:r.name});
     });
   });
   const items = Object.values(all).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
@@ -1058,6 +1224,7 @@ function renderShopping() {
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
   const ingToBuy = (state.ingredientItems||[]).filter(i=>i.needToBuy);
+  const pantryToBuy = (state.pantryItems||[]).filter(i=>i.needToBuy);
   const weekNav = `<div class="week-nav">
     <button onclick="weekOffset--;render()">◀</button>
     <span class="week-label">${fmtDate(ws)} — ${fmtDate(we)}</span>
@@ -1082,13 +1249,23 @@ function renderShopping() {
         <label style="cursor:pointer" onclick="buyIngredientItem('${item.id}')">${escHtml(item.name)}</label>
       </div>`).join('')}
     </div>` : '';
+  const pantrySection = pantryToBuy.length>0 ? `
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber-light)">🫙 Placard à racheter</h3>
+      ${pantryToBuy.map(item=>`
+      <div class="shop-item">
+        <input type="checkbox" onchange="buyPantryItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
+        <label style="cursor:pointer" onclick="buyPantryItem('${item.id}')">${escHtml(item.name)}</label>
+      </div>`).join('')}
+    </div>` : '';
 
   if (items.length===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
     ${weekNav}
+    ${pantrySection}
     ${ingSection}
     ${maisonSection}
-    ${maisonToBuy.length===0&&ingToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
+    ${maisonToBuy.length===0&&ingToBuy.length===0&&pantryToBuy.length===0?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Utilisez les onglets <b>Ingrédients</b> et <b>Maison</b> pour ajouter des articles.</p></div>`:''}
     ${renderHistorySection()}
   `;
   const doneCount = items.filter(it=>checked[it.name.toLowerCase().trim()]).length;
@@ -1101,6 +1278,7 @@ function renderShopping() {
       <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
     </div>
   </div>
+  ${pantrySection}
   ${ingSection}
   ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between">
@@ -1111,7 +1289,7 @@ function renderShopping() {
   ${items.map(it => {
     const key = it.name.toLowerCase().trim();
     const isChecked = !!checked[key];
-    const summary = it.entries.map(e=>`${e.q} ${e.u}`).join(' + ');
+    const summary = sumQty(it.entries);
     return `<div class="shop-item ${isChecked?'checked':''}">
       <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
       <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b> <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span></label>
