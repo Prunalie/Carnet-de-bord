@@ -1206,8 +1206,6 @@ function openPlanFromRecipe(recipeId) {
   _planRecipeId = recipeId;
   _planWeekOffset = weekOffset;
   const r = recipeById(recipeId); if (!r) return;
-  const h = new Date().getHours();
-  const defaultMeal = h < 11 ? 'matin' : h < 15 ? 'midi' : 'soir';
   document.getElementById('modal-content').innerHTML = `
     <button class="modal-close" onclick="closeModal()">×</button>
     <h2>📅 Planifier</h2>
@@ -1217,14 +1215,7 @@ function openPlanFromRecipe(recipeId) {
       <span id="plan-week-label" style="flex:1;text-align:center;font-size:.82rem;color:var(--text-muted)"></span>
       <button class="btn btn-outline btn-sm" onclick="shiftPlanWeek(1)">▶</button>
     </div>
-    <div class="form-group" style="margin-bottom:14px"><label style="margin-bottom:8px;display:block">Repas</label>
-      <div style="display:flex;gap:8px">
-        ${MEALS.map(m=>`<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;background:var(--card);font-size:.9rem">
-          <input type="radio" name="plan-meal-r" value="${m.k}" ${m.k===defaultMeal?'checked':''} style="accent-color:var(--green)"> ${m.label}
-        </label>`).join('')}
-      </div>
-    </div>
-    <div style="margin-bottom:6px;font-size:.85rem;font-weight:700;color:var(--text-muted)">Jours</div>
+    <div style="margin-bottom:6px;font-size:.85rem;font-weight:700;color:var(--text-muted)">Cochez les créneaux souhaités</div>
     <div id="plan-days-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px"></div>
     <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:8px;border:1.5px solid #c4b5fd;cursor:pointer;background:#f3f0ff;margin-bottom:16px">
       <span style="font-size:.88rem;color:#6b48d0">📌 Sans jour précis (menu de la semaine)</span>
@@ -1244,28 +1235,45 @@ function shiftPlanWeek(delta) {
   refreshPlanModalWeek();
 }
 
+function planDayToggle(dk, checked) {
+  const row = document.getElementById(`plan-meal-${dk}`);
+  if (row) row.style.display = checked ? 'flex' : 'none';
+}
+
 function refreshPlanModalWeek() {
   const ws = getWeekStart(_planWeekOffset);
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const weekKey = ws.toISOString().slice(0,10);
   const today = new Date(); today.setHours(0,0,0,0);
-  // Preserve checked states
-  const prevChecked = {};
+  const h = new Date().getHours();
+  const defaultMeal = h < 11 ? 'matin' : h < 15 ? 'midi' : 'soir';
+  // Preserve checked + meal states across week navigation
+  const prevStates = {};
   DAYS_K.forEach(dk => {
-    const el = document.getElementById(`plan-ck-${dk}`);
-    if (el) prevChecked[dk] = el.checked;
+    const ck = document.getElementById(`plan-ck-${dk}`);
+    const meal = document.querySelector(`input[name="plan-meal-r-${dk}"]:checked`)?.value;
+    if (ck) prevStates[dk] = {checked: ck.checked, meal: meal || defaultMeal};
   });
-  // Rebuild day checkboxes with updated dates
   const grid = document.getElementById('plan-days-grid');
   if (grid) {
     grid.innerHTML = DAYS_K.map((dk, i) => {
       const dt = new Date(ws); dt.setDate(dt.getDate() + i);
       const isToday = dt.toDateString() === today.toDateString();
-      const checked = prevChecked[dk] ?? false;
-      return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:8px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};cursor:pointer;background:${isToday?'var(--green-light)':'var(--card)'};font-size:.88rem">
-        <span><b>${DAYS[i]}</b> <span style="color:var(--text-muted);font-size:.8rem">${fmtDate(dt)}</span></span>
-        <input type="checkbox" id="plan-ck-${dk}" value="${dk}" ${checked?'checked':''} style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
-      </label>`;
+      const st = prevStates[dk] || {checked: false, meal: defaultMeal};
+      const mealOpts = MEALS.map(m =>
+        `<label style="display:flex;align-items:center;gap:3px;font-size:.78rem;cursor:pointer;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg)">
+          <input type="radio" name="plan-meal-r-${dk}" value="${m.k}" ${m.k===st.meal?'checked':''} style="accent-color:var(--green)"> ${m.label}
+        </label>`
+      ).join('');
+      return `<div style="display:flex;flex-direction:column;border-radius:8px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};background:${isToday?'var(--green-light)':'var(--card)'};overflow:hidden">
+        <label for="plan-ck-${dk}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;cursor:pointer">
+          <span style="font-size:.88rem"><b>${DAYS[i]}</b> <span style="color:var(--text-muted);font-size:.8rem">${fmtDate(dt)}</span></span>
+          <input type="checkbox" id="plan-ck-${dk}" value="${dk}" ${st.checked?'checked':''} onchange="planDayToggle('${dk}',this.checked)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
+        </label>
+        <div id="plan-meal-${dk}" style="display:${st.checked?'flex':'none'};flex-wrap:wrap;gap:5px;padding:4px 12px 10px">
+          ${mealOpts}
+        </div>
+      </div>`;
     }).join('');
   }
   document.getElementById('plan-week-label').textContent = `${fmtDate(ws)} — ${fmtDate(we)}`;
@@ -1274,32 +1282,30 @@ function refreshPlanModalWeek() {
 
 function confirmPlanRecipe() {
   const weekKey = document.getElementById('plan-confirm-btn').dataset.weekkey;
-  const meal = document.querySelector('input[name="plan-meal-r"]:checked')?.value || 'soir';
   const checkedDays = DAYS_K.filter(dk => document.getElementById(`plan-ck-${dk}`)?.checked);
   const addFree = document.getElementById('plan-ck-free')?.checked;
   if (!checkedDays.length && !addFree) {
-    alert('Sélectionnez au moins un jour ou "Sans jour précis".');
+    alert('Sélectionnez au moins un créneau ou "Sans jour précis".');
     return;
   }
   const plan = getOrCreatePlan(weekKey);
   const r = recipeById(_planRecipeId);
+  const addedSlots = [];
   checkedDays.forEach(dk => {
+    const meal = document.querySelector(`input[name="plan-meal-r-${dk}"]:checked`)?.value || 'soir';
     if (!plan.days[dk]) plan.days[dk] = {};
     plan.days[dk][meal] = _planRecipeId;
+    const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
+    addedSlots.push(`${DAYS[DAYS_K.indexOf(dk)]} ${mealLabel}`);
   });
   if (addFree && !plan.freeRecipes.includes(_planRecipeId)) plan.freeRecipes.push(_planRecipeId);
+  if (addFree) addedSlots.push('menu semaine');
   save(); closeModal(); renderMain();
-  const parts = [];
-  if (checkedDays.length) {
-    const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
-    parts.push(`${checkedDays.map(dk=>DAYS[DAYS_K.indexOf(dk)]).join(', ')} ${mealLabel}`);
-  }
-  if (addFree) parts.push('menu semaine');
   const t = document.createElement('div');
   t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green-dark);color:#fff;padding:10px 20px;border-radius:20px;font-size:.88rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3)';
-  t.textContent = `✅ ${r?.name} → ${parts.join(' + ')}`;
+  t.textContent = `✅ ${r?.name} → ${addedSlots.join(' + ')}`;
   document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 2800);
+  setTimeout(()=>t.remove(), 3500);
 }
 
 // ═══════════════════════════════════════════════════════
