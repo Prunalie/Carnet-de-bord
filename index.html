@@ -600,12 +600,12 @@ function setTab(id) { activeTab = id; render(); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function getWeekStart(offset=0) {
-  const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day===0?-6:1) + offset*7;
-  d.setDate(diff); d.setHours(0,0,0,0); return d;
+  const d = new Date(); const day = d.getDay();
+  d.setDate(d.getDate() - (day + 1) % 7 + offset * 7); d.setHours(0,0,0,0); return d;
 }
 function fmtDate(d) { return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}); }
-const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-const DAYS_K = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+const DAYS = ['Samedi','Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi'];
+const DAYS_K = ['samedi','dimanche','lundi','mardi','mercredi','jeudi','vendredi'];
 const MEALS = [{k:'matin',label:'Matin'},{k:'midi',label:'Midi'},{k:'soir',label:'Soir'}];
 const SEASON_OPT = [{v:'printemps',l:'🌱 Printemps'},{v:'été',l:'☀️ Été'},{v:'automne',l:'🍂 Automne'},{v:'hiver',l:'❄️ Hiver'},{v:'toutes',l:'🗓️ Toutes saisons'}];
 const TAG_OPT = [{v:'végétarien',l:'🥦 Végétarien'},{v:'vegan',l:'🌿 Vegan'},{v:'four',l:'♨️ Four'},{v:'poêle',l:'🍳 Poêle'},{v:'casserole',l:'🥘 Casserole'},{v:'vapeur',l:'💨 Vapeur'},{v:'mijotage',l:'⏱️ Mijotage'},{v:'rapide',l:'⚡ Rapide'},{v:'sans cuisson',l:'🥗 Sans cuisson'}];
