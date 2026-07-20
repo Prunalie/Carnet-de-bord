@@ -107,6 +107,27 @@ textarea{resize:vertical;min-height:80px}
   .planner-days{grid-template-columns:1fr}
   .modal-close{position:fixed;top:12px;right:12px;z-index:600;background:var(--card);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:1.2rem}
 }
+/* PORTAIL */
+body.portal-mode #sidebar,body.portal-mode #header,body.portal-mode #main,body.portal-mode #bottom-nav,body.portal-mode #maison-app{display:none!important}
+body.portal-mode #portal{display:block}
+/* MAISON APP */
+body.maison-mode #sidebar,body.maison-mode #header,body.maison-mode #main,body.maison-mode #bottom-nav,body.maison-mode #portal{display:none!important}
+body.maison-mode #maison-app{display:block}
+#maison-app{display:none;min-height:100vh;background:var(--bg)}
+#portal{display:none;min-height:100vh;background:var(--bg)}
+.portal-hero{background:var(--green-dark);color:#fff;padding:28px 24px}
+.portal-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:28px 24px;max-width:980px;margin:0 auto}
+@media(max-width:700px){.portal-cards{grid-template-columns:1fr}}
+.portal-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 20px;text-align:center;cursor:pointer;transition:.2s;border:2px solid var(--border)}
+.portal-card:not(.soon):hover{border-color:var(--green);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.portal-card.soon{cursor:default;opacity:.6}
+.pc-avatar{font-size:3.2rem;margin-bottom:12px}
+.pc-name{font-size:1.2rem;font-weight:700;color:var(--green-dark);margin-bottom:6px}
+.pc-badge{font-size:.75rem;color:var(--text-muted);background:var(--green-light);padding:3px 12px;border-radius:20px;display:inline-block;margin-top:8px}
+.portal-links{margin-top:16px;display:flex;flex-direction:column;gap:8px;text-align:left}
+.portal-link{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);background:var(--bg);border:1.5px solid var(--border);font-size:.88rem;font-weight:600;color:var(--text);cursor:pointer;transition:.15s;user-select:none}
+.portal-link:hover{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
+.pl-icon{font-size:1.15rem;width:24px;text-align:center;flex-shrink:0}
 /* SHOPPING */
 .shop-section{margin-bottom:20px}
 .shop-section h3{font-weight:700;color:var(--green-dark);margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid var(--green-light)}
@@ -158,13 +179,21 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 </style>
 </head>
 <body>
+<div id="portal"></div>
+<div id="maison-app"></div>
 <div id="sidebar">
   <div class="sidebar-logo"><span>🍽️</span> Carnet de Bord</div>
   <nav id="sidebar-nav"></nav>
-  <div class="sidebar-footer"><button onclick="toggleSync()">💾 Données</button></div>
+  <div class="sidebar-footer">
+    <button onclick="showPortal()" style="margin-bottom:6px;background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.85);border-radius:var(--radius-sm);padding:8px 14px;cursor:pointer;font-size:.83rem;font-weight:600;width:100%">← Accueil</button>
+    <button onclick="toggleSync()">💾 Données</button>
+  </div>
 </div>
 <div id="header">
-  <h1><span>🍽️</span> Carnet de Bord</h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button onclick="showPortal()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;padding:4px 2px;line-height:1">←</button>
+    <h1><span>🍽️</span> Famille</h1>
+  </div>
   <button id="sync-btn" onclick="toggleSync()">💾 Données</button>
 </div>
 <div id="main"></div>
@@ -445,6 +474,8 @@ function ensureStateFields() {
   if (!state.mealsDone) state.mealsDone = {};
   if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.shoppingHistory) state.shoppingHistory = [];
+  if (!state.contacts) state.contacts = [];
+  if (!state.customLists) state.customLists = [];
 }
 
 function normIngName(n) { return (n||'').toLowerCase().trim().replace(/s$/,''); }
@@ -584,6 +615,67 @@ const NAV_TABS = [
   {id:'notes',     icon:'📝', label:'Notes'},
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
+function showPortal() {
+  document.body.classList.remove('maison-mode');
+  document.body.classList.add('portal-mode');
+  renderPortal();
+}
+function enterFamille(tab) {
+  activeTab = tab || 'home';
+  document.body.classList.remove('portal-mode');
+  document.body.classList.remove('maison-mode');
+  render();
+}
+function showMaison() {
+  _activeListId = null;
+  document.body.classList.remove('portal-mode');
+  document.body.classList.add('maison-mode');
+  renderMaisonApp();
+}
+function renderMaisonApp() {
+  const content = renderListes();
+  document.getElementById('maison-app').innerHTML = `
+    <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
+      <button onclick="showPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
+      <h1 style="font-size:1.1rem;font-weight:700;margin:0">🏠 Maison</h1>
+    </div>
+    <div style="padding:20px;max-width:800px;margin:0 auto">${content}</div>`;
+}
+function renderPortal() {
+  document.getElementById('portal').innerHTML = `
+    <div class="portal-hero">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:2rem">🏡</span>
+        <div>
+          <h1 style="font-size:1.3rem;font-weight:700;margin:0">Carnet de Bord</h1>
+          <div style="font-size:.85rem;opacity:.75;margin-top:2px">Choisissez votre espace</div>
+        </div>
+      </div>
+    </div>
+    <div class="portal-cards">
+      <div class="portal-card soon">
+        <div class="pc-avatar">👩</div>
+        <div class="pc-name">Margot</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
+        <div class="pc-badge">À venir</div>
+      </div>
+      <div class="portal-card soon">
+        <div class="pc-avatar">👦</div>
+        <div class="pc-name">Charlot</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
+        <div class="pc-badge">À venir</div>
+      </div>
+      <div class="portal-card" onclick="enterFamille('home')">
+        <div class="pc-avatar">👨‍👩‍👧</div>
+        <div class="pc-name">Famille</div>
+        <div class="portal-links">
+          <div class="portal-link" onclick="event.stopPropagation();enterFamille('recipes')"><span class="pl-icon">🍽️</span> Carnet de recettes</div>
+          <div class="portal-link" onclick="event.stopPropagation();showMaison()"><span class="pl-icon">🏠</span> Maison</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderNav() {
   const btns = NAV_TABS.map(t =>
     `<button class="${t.id===activeTab?'active':''}" onclick="setTab('${t.id}')">
@@ -636,6 +728,8 @@ function render() {
   else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
   else if (activeTab==='maison') main.innerHTML = renderMaison();
   else if (activeTab==='notes') main.innerHTML = renderNotes();
+  else if (activeTab==='adresses') main.innerHTML = renderAdresses();
+  else if (activeTab==='listes') main.innerHTML = renderListes();
 }
 function renderHome() {
   const p1 = state.profiles?.[0], p2 = state.profiles?.[1];
@@ -792,6 +886,8 @@ function renderMain() {
   else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
   else if (activeTab==='maison') m.innerHTML=renderMaison();
   else if (activeTab==='notes') m.innerHTML=renderNotes();
+  else if (activeTab==='adresses') m.innerHTML=renderAdresses();
+  else if (activeTab==='listes') m.innerHTML=renderListes();
   else m.innerHTML=renderShopping();
 }
 
@@ -1878,10 +1974,205 @@ document.getElementById('picker-overlay').addEventListener('click',e=>{ if(e.tar
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeModal();closePicker();} });
 
 // ═══════════════════════════════════════════════════════
+// CARNET D'ADRESSES
+// ═══════════════════════════════════════════════════════
+function renderAdresses() {
+  const contacts = (state.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  return `
+    <div class="section-header">
+      <h2>📖 Carnet d'adresses</h2>
+      <button class="btn btn-primary btn-sm" onclick="openContactForm()">+ Ajouter</button>
+    </div>
+    <input class="search-box" id="addr-q" placeholder="🔍 Rechercher…" oninput="filterContacts(this.value)" style="margin-bottom:14px;width:100%">
+    ${contacts.length===0?`<div class="empty-state"><div class="icon">📖</div><p>Aucun contact pour l'instant.<br>Ajoutez vos premiers contacts !</p></div>`:`
+    <div id="contacts-list" style="display:flex;flex-direction:column;gap:8px">
+      ${contacts.map(c=>`
+        <div class="contact-item" data-search="${escHtml((c.name+' '+(c.phone||'')+' '+(c.address||'')).toLowerCase())}" style="background:var(--card);border-radius:var(--radius-sm);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:13px 15px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openContactDetail('${c.id}')">
+          <div style="width:42px;height:42px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:var(--green-dark);flex-shrink:0">${escHtml(c.name[0]?.toUpperCase()||'?')}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.95rem">${escHtml(c.name)}</div>
+            ${c.phone?`<div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">📞 ${escHtml(c.phone)}</div>`:''}
+            ${c.address?`<div style="font-size:.82rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 ${escHtml(c.address)}</div>`:''}
+          </div>
+          <button class="btn btn-outline btn-sm" style="padding:3px 8px;flex-shrink:0" onclick="event.stopPropagation();openContactForm('${c.id}')">✏️</button>
+        </div>`).join('')}
+    </div>`}`;
+}
+function filterContacts(q) {
+  const lower = q.toLowerCase();
+  document.querySelectorAll('.contact-item').forEach(el=>{
+    el.style.display = el.dataset.search.includes(lower)?'':'none';
+  });
+}
+function openContactDetail(id) {
+  const c = (state.contacts||[]).find(x=>x.id===id); if(!c) return;
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;color:var(--green-dark);flex-shrink:0">${escHtml(c.name[0]?.toUpperCase()||'?')}</div>
+      <h2 style="margin:0">${escHtml(c.name)}</h2>
+    </div>
+    ${c.phone?`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:1.3rem">📞</span><a href="tel:${escHtml(c.phone)}" style="color:var(--green-dark);font-weight:600;text-decoration:none">${escHtml(c.phone)}</a></div>`:''}
+    ${c.email?`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:1.3rem">✉️</span><a href="mailto:${escHtml(c.email)}" style="color:var(--green-dark);text-decoration:none">${escHtml(c.email)}</a></div>`:''}
+    ${c.address?`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:1.3rem">📍</span><span>${escHtml(c.address)}</span></div>`:''}
+    ${c.notes?`<div style="margin-top:14px;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:.9rem;line-height:1.5;color:var(--text-muted)">${escHtml(c.notes)}</div>`:''}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-outline" onclick="closeModal()">Fermer</button>
+      <button class="btn btn-primary" onclick="closeModal();openContactForm('${id}')">✏️ Modifier</button>
+    </div>`;
+  openModal();
+}
+function openContactForm(id) {
+  const c = id?(state.contacts||[]).find(x=>x.id===id):null;
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>${c?'Modifier le contact':'Nouveau contact'}</h2>
+    <div class="form-group"><label>Nom *</label><input type="text" id="cf-name" value="${escHtml(c?.name||'')}" placeholder="Prénom Nom"></div>
+    <div class="form-group"><label>Téléphone</label><input type="tel" id="cf-phone" value="${escHtml(c?.phone||'')}" placeholder="06 12 34 56 78"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="cf-email" value="${escHtml(c?.email||'')}" placeholder="email@exemple.com"></div>
+    <div class="form-group"><label>Adresse</label><input type="text" id="cf-address" value="${escHtml(c?.address||'')}" placeholder="Rue, ville…"></div>
+    <div class="form-group"><label>Notes</label><textarea id="cf-notes" rows="3" style="resize:vertical;width:100%">${escHtml(c?.notes||'')}</textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      ${c?`<button class="btn btn-outline" style="color:#e53e3e;border-color:#e53e3e;margin-right:auto" onclick="deleteContact('${id}')">🗑 Supprimer</button>`:''}
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveContact('${id||''}')">💾 Enregistrer</button>
+    </div>`;
+  openModal();
+}
+function saveContact(id) {
+  const name = document.getElementById('cf-name')?.value?.trim();
+  if(!name){alert('Le nom est obligatoire.');return;}
+  if(!state.contacts) state.contacts=[];
+  const contact={id:id||uid(),name,phone:document.getElementById('cf-phone')?.value?.trim()||'',email:document.getElementById('cf-email')?.value?.trim()||'',address:document.getElementById('cf-address')?.value?.trim()||'',notes:document.getElementById('cf-notes')?.value?.trim()||''};
+  if(id){const idx=state.contacts.findIndex(c=>c.id===id);if(idx>=0)state.contacts[idx]=contact;else state.contacts.push(contact);}
+  else state.contacts.push(contact);
+  save(); closeModal(); renderMain();
+}
+function deleteContact(id) {
+  if(confirm('Supprimer ce contact ?')){state.contacts=(state.contacts||[]).filter(c=>c.id!==id);save();closeModal();renderMain();}
+}
+
+// ═══════════════════════════════════════════════════════
+// MAISON & LISTES
+// ═══════════════════════════════════════════════════════
+let _activeListId = null;
+function renderListes() {
+  if(_activeListId) return renderListeDetail(_activeListId);
+  const lists = state.customLists||[];
+  return `
+    <div class="section-header">
+      <button class="btn btn-primary btn-sm" onclick="openNewListeForm()">+ Nouvelle liste</button>
+    </div>
+    ${lists.length===0?`<div class="empty-state"><div class="icon">🏠</div><p>Aucune liste pour l'instant.<br>Créez votre première liste !</p></div>`:`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+      ${lists.map(l=>`
+        <div onclick="openListe('${l.id}')" style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:20px 16px;text-align:center;cursor:pointer;transition:.2s" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:2.4rem;margin-bottom:10px">${escHtml(l.icon||'📝')}</div>
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:4px">${escHtml(l.name)}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${(l.items||[]).filter(i=>!i.done).length} à faire</div>
+        </div>`).join('')}
+    </div>`}`;
+}
+function openListe(id){_activeListId=id;renderMaisonApp();}
+function renderListeDetail(listId) {
+  const list=(state.customLists||[]).find(l=>l.id===listId);
+  if(!list){_activeListId=null;return renderListes();}
+  const items=list.items||[];
+  const pending=items.filter(i=>!i.done);
+  const done=items.filter(i=>i.done);
+  return `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="_activeListId=null;renderMaisonApp()">← Retour</button>
+      <h2 style="font-size:1.15rem;color:var(--green-dark);margin:0;flex:1">${escHtml(list.icon||'📝')} ${escHtml(list.name)}</h2>
+      <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteListeConfirm('${listId}')">🗑</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <input id="new-list-item" class="search-box" style="flex:1;margin:0" placeholder="Ajouter un élément…" onkeydown="if(event.key==='Enter')addListeItem('${listId}')">
+      <button class="btn btn-primary" onclick="addListeItem('${listId}')">+</button>
+    </div>
+    ${pending.length===0&&done.length===0?`<div class="empty-state" style="padding:30px 0"><p>Liste vide. Ajoutez votre premier élément !</p></div>`:''}
+    <div style="display:flex;flex-direction:column">
+      ${pending.map(i=>`
+        <label style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--green-light);cursor:pointer">
+          <input type="checkbox" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="toggleListeItem('${listId}','${i.id}',this.checked)">
+          <span style="flex:1;font-size:.93rem">${escHtml(i.text)}</span>
+          <button onclick="event.stopPropagation();event.preventDefault();deleteListeItem('${listId}','${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px 6px">✕</button>
+        </label>`).join('')}
+    </div>
+    ${done.length>0?`
+      <div style="margin-top:18px;color:var(--text-muted);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">✅ Terminé (${done.length})</div>
+      <div style="display:flex;flex-direction:column;opacity:.65">
+        ${done.map(i=>`
+          <label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--green-light);cursor:pointer">
+            <input type="checkbox" checked style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="toggleListeItem('${listId}','${i.id}',this.checked)">
+            <span style="flex:1;font-size:.93rem;text-decoration:line-through;color:var(--text-muted)">${escHtml(i.text)}</span>
+            <button onclick="event.stopPropagation();event.preventDefault();deleteListeItem('${listId}','${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px 6px">✕</button>
+          </label>`).join('')}
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="clearListeDone('${listId}')">🗑 Effacer les éléments terminés</button>`:''}`;
+}
+function addListeItem(listId) {
+  const input=document.getElementById('new-list-item');
+  const text=input?.value?.trim(); if(!text) return;
+  const list=(state.customLists||[]).find(l=>l.id===listId); if(!list) return;
+  if(!list.items) list.items=[];
+  list.items.push({id:uid(),text,done:false});
+  save(); input.value=''; renderMaisonApp();
+  document.getElementById('new-list-item')?.focus();
+}
+function toggleListeItem(listId,itemId,done) {
+  const list=(state.customLists||[]).find(l=>l.id===listId);
+  const item=list?.items?.find(i=>i.id===itemId);
+  if(item){item.done=done;save();renderMaisonApp();}
+}
+function deleteListeItem(listId,itemId) {
+  const list=(state.customLists||[]).find(l=>l.id===listId);
+  if(list?.items){list.items=list.items.filter(i=>i.id!==itemId);save();renderMaisonApp();}
+}
+function clearListeDone(listId) {
+  const list=(state.customLists||[]).find(l=>l.id===listId);
+  if(list?.items){list.items=list.items.filter(i=>!i.done);save();renderMaisonApp();}
+}
+function deleteListeConfirm(listId) {
+  if(confirm('Supprimer cette liste et tous ses éléments ?')){
+    state.customLists=(state.customLists||[]).filter(l=>l.id!==listId);
+    _activeListId=null; save(); renderMaisonApp();
+  }
+}
+function openNewListeForm() {
+  const icons=['📝','✅','🛒','🔨','🌱','🏋️','📚','🎯','🧹','🎨','💡','⭐'];
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>🏠 Nouvelle liste</h2>
+    <div class="form-group"><label>Icône</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${icons.map(ic=>`<span onclick="document.getElementById('liste-icon').value='${ic}';document.querySelectorAll('.icon-opt').forEach(e=>e.style.background='none');this.style.background='var(--green-light)'" class="icon-opt" style="font-size:1.5rem;cursor:pointer;padding:5px 8px;border-radius:8px;border:2px solid var(--border)">${ic}</span>`).join('')}
+      </div>
+      <input type="text" id="liste-icon" value="📝" placeholder="Emoji personnalisé" style="width:90px">
+    </div>
+    <div class="form-group"><label>Nom de la liste *</label><input type="text" id="liste-name" placeholder="Ex : À faire, Jardinage…"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveNewListe()">Créer</button>
+    </div>`;
+  openModal();
+  document.getElementById('liste-name').focus();
+}
+function saveNewListe() {
+  const name=document.getElementById('liste-name')?.value?.trim();
+  const icon=document.getElementById('liste-icon')?.value?.trim()||'📝';
+  if(!name){alert('Donnez un nom à votre liste.');return;}
+  if(!state.customLists) state.customLists=[];
+  const id=uid();
+  state.customLists.push({id,name,icon,items:[]});
+  save(); closeModal(); _activeListId=id; renderMaisonApp();
+}
+
+// ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 loadFromStorage(); // Affichage immédiat depuis le cache local
-render();
+showPortal();
 initFirestore();  // Puis synchronisation avec Firebase
 </script>
 </body>
