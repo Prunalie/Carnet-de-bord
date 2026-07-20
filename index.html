@@ -908,6 +908,50 @@ function saveRecipeForm(existingId) {
   };
   if (existingId) { const idx=state.recipes.findIndex(r=>r.id===existingId); state.recipes[idx]=recipe; }
   else { state.recipes.push(recipe); }
+  save(); closeModal();
+  // Détecter les ingrédients de la recette absents de masterIngredients
+  const seen = new Set();
+  const newIngs = recipe.ingredients
+    .map(i=>i.n.trim()).filter(Boolean)
+    .filter(name => {
+      const norm = normIngName(name);
+      if (seen.has(norm)) return false;
+      seen.add(norm);
+      return !(state.masterIngredients||[]).some(m=>normIngName(m.name)===norm);
+    });
+  if (newIngs.length) openNewIngredientsModal(newIngs);
+  else renderMain();
+}
+
+let _pendingNewIngs = [];
+function openNewIngredientsModal(names) {
+  _pendingNewIngs = names;
+  const catOpts = ingCats().map(c=>`<option value="${c.k}">${c.l}</option>`).join('');
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal();renderMain()">×</button>
+    <h2>🥕 Nouveaux ingrédients détectés</h2>
+    <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:14px">Ces ingrédients de la recette ne sont pas encore dans votre liste. Cochez ceux à ajouter et choisissez leur rayon :</p>
+    ${names.map((n,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:9px 12px;background:var(--green-light);border-radius:8px">
+      <input type="checkbox" checked id="ni-ck-${i}" style="width:17px;height:17px;accent-color:var(--green);flex-shrink:0;cursor:pointer">
+      <label for="ni-ck-${i}" style="flex:1;font-weight:600;font-size:.9rem;cursor:pointer">${escHtml(n)}</label>
+      <select id="ni-cat-${i}" style="font-size:.8rem;border:1.5px solid var(--border);border-radius:6px;padding:4px 6px;background:var(--card);max-width:140px">${catOpts}</select>
+    </div>`).join('')}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal();renderMain()">Ignorer</button>
+      <button class="btn btn-primary" onclick="saveNewIngredients()">✔ Ajouter à ma liste</button>
+    </div>`;
+  openModal();
+}
+function saveNewIngredients() {
+  if (!state.masterIngredients) state.masterIngredients = [];
+  _pendingNewIngs.forEach((name, i) => {
+    if (!document.getElementById(`ni-ck-${i}`)?.checked) return;
+    const cat = document.getElementById(`ni-cat-${i}`)?.value || 'autre';
+    const norm = normIngName(name);
+    if (!state.masterIngredients.some(m=>normIngName(m.name)===norm))
+      state.masterIngredients.push({id:uid(), name, type:'shopping', cat, needToBuy:false});
+  });
   save(); closeModal(); renderMain();
 }
 
