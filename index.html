@@ -127,6 +127,26 @@ body.maison-mode #maison-app{display:block}
 .pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;margin-top:24px}
 .pin-key{height:72px;font-size:1.4rem;font-weight:600;border:2px solid var(--border);background:var(--card);border-radius:var(--radius);cursor:pointer;color:var(--text)}
 .pin-key:active{background:var(--green);color:#fff;border-color:var(--green)}
+/* ── Charlot app ── */
+.ch-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:50;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+.ch-nav button{flex:1;padding:10px 4px 8px;border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:.7rem;display:flex;flex-direction:column;align-items:center;gap:3px}
+.ch-nav button .ch-ni{font-size:1.3rem;line-height:1}
+.ch-nav button.active{color:var(--green);font-weight:600}
+.ch-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px}
+.ch-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.ch-card-meta{font-size:.8rem;color:var(--text-muted);margin-top:4px}
+.ch-badge-paye{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer;user-select:none}
+.ch-badge-paye.oui{background:#d1fae5;color:#065f46}
+.ch-badge-paye.non{background:#fee2e2;color:#991b1b}
+.ch-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.ch-stat{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:16px;text-align:center}
+.ch-stat .val{font-size:1.4rem;font-weight:700;color:var(--green)}
+.ch-stat .lbl{font-size:.78rem;color:var(--text-muted);margin-top:4px}
+.ch-stat.red .val{color:#e53e3e}
+.ch-stat.blue .val{color:#3b82f6}
+.ch-stat.orange .val{color:#f59e0b}
+.ch-section-total{background:var(--green-light,#f0fdf4);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.88rem}
+@media(prefers-color-scheme:dark){.ch-badge-paye.oui{background:#064e3b;color:#6ee7b7}.ch-badge-paye.non{background:#7f1d1d;color:#fca5a5}}
 .pc-avatar{font-size:3.2rem;margin-bottom:12px}
 .pc-name{font-size:1.2rem;font-weight:700;color:var(--green-dark);margin-bottom:6px}
 .pc-badge{font-size:.75rem;color:var(--text-muted);background:var(--green-light);padding:3px 12px;border-radius:20px;display:inline-block;margin-top:8px}
@@ -482,6 +502,11 @@ function ensureStateFields() {
   if (!state.shoppingHistory) state.shoppingHistory = [];
   if (!state.contacts) state.contacts = [];
   if (!state.customLists) state.customLists = [];
+  if (!state.charlot) state.charlot = {contrats:[],pensions:[],cours:[],charges:[]};
+  if (!state.charlot.contrats) state.charlot.contrats = [];
+  if (!state.charlot.pensions) state.charlot.pensions = [];
+  if (!state.charlot.cours) state.charlot.cours = [];
+  if (!state.charlot.charges) state.charlot.charges = [];
 }
 
 function normIngName(n) { return (n||'').toLowerCase().trim().replace(/s$/,''); }
@@ -749,21 +774,249 @@ function checkPin() {
 }
 
 function enterPersonalSpace(person) {
-  const name = person === 'margot' ? 'Margot' : 'Charlot';
-  const avatar = person === 'margot' ? '👩' : '👦';
+  if (person === 'charlot') { _charlotTab = 'home'; renderCharlotSpace(); return; }
+  const name = 'Margot';
   document.getElementById('portal').innerHTML = `
     <div class="portal-hero">
       <div style="display:flex;align-items:center;gap:12px">
         <button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
-        <div style="font-size:1.6rem">${avatar}</div>
+        <div style="font-size:1.6rem">👩</div>
         <h1 style="font-size:1.2rem;font-weight:700;margin:0">Espace ${name}</h1>
       </div>
     </div>
     <div style="padding:60px 20px;text-align:center">
-      <div style="font-size:4rem;margin-bottom:16px">${avatar}</div>
+      <div style="font-size:4rem;margin-bottom:16px">👩</div>
       <h2 style="font-size:1.3rem;margin-bottom:8px">Bonjour ${name} !</h2>
       <p style="color:var(--text-muted)">Ton espace personnel arrive bientôt.</p>
     </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// ESPACE CHARLOT
+// ═══════════════════════════════════════════════════════
+let _charlotTab = 'home';
+const CH_TABS = [
+  {id:'home',    icon:'🏠', label:'Accueil'},
+  {id:'contrats',icon:'📋', label:'Contrats'},
+  {id:'pensions',icon:'🐕', label:'Pensions'},
+  {id:'cours',   icon:'🎓', label:'Cours'},
+  {id:'charges', icon:'💸', label:'Charges'},
+];
+
+function setCharlotTab(id) { _charlotTab = id; renderCharlotSpace(); }
+
+function renderCharlotSpace() {
+  const nav = CH_TABS.map(t =>
+    `<button class="${t.id===_charlotTab?'active':''}" onclick="setCharlotTab('${t.id}')">
+      <span class="ch-ni">${t.icon}</span>${t.label}
+    </button>`
+  ).join('');
+  let content = '';
+  if (_charlotTab==='home')     content = renderCharlotHome();
+  if (_charlotTab==='contrats') content = renderCharlotSection('contrats');
+  if (_charlotTab==='pensions') content = renderCharlotSection('pensions');
+  if (_charlotTab==='cours')    content = renderCharlotSection('cours');
+  if (_charlotTab==='charges')  content = renderCharlotSection('charges');
+  document.getElementById('portal').innerHTML = `
+    <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
+      <button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
+      <span style="font-size:1.3rem">👦</span>
+      <h1 style="font-size:1.1rem;font-weight:700;margin:0">Charlot</h1>
+    </div>
+    <div style="padding:16px;max-width:800px;margin:0 auto;padding-bottom:90px">${content}</div>
+    <nav class="ch-nav">${nav}</nav>`;
+}
+
+function fmtEur(n) { return Number(n||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2}); }
+function fmtDateFr(s) { if(!s) return ''; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; }
+function todayISO() { return new Date().toISOString().slice(0,10); }
+
+function renderCharlotHome() {
+  const c = state.charlot||{};
+  const allRevenu = [...(c.contrats||[]),...(c.pensions||[]),...(c.cours||[])];
+  const totalCA   = allRevenu.reduce((s,e)=>s+Number(e.montant||0),0);
+  const totalPaye = allRevenu.filter(e=>e.paye).reduce((s,e)=>s+Number(e.montant||0),0);
+  const totalAttente = totalCA - totalPaye;
+  const totalCharges = (c.charges||[]).reduce((s,e)=>s+Number(e.montant||0),0);
+  const net = totalPaye - totalCharges;
+  const bySection = [
+    {label:'Contrats',    icon:'📋', list:c.contrats||[]},
+    {label:'Pensions',    icon:'🐕', list:c.pensions||[]},
+    {label:"Cours d'éduc",icon:'🎓', list:c.cours||[]},
+  ];
+  const sectRows = bySection.map(s=>{
+    const total = s.list.reduce((sum,e)=>sum+Number(e.montant||0),0);
+    const paye  = s.list.filter(e=>e.paye).reduce((sum,e)=>sum+Number(e.montant||0),0);
+    const nb = s.list.length;
+    return `<div class="ch-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <div><span style="margin-right:6px">${s.icon}</span><strong>${s.label}</strong>
+        <span style="color:var(--text-muted);font-size:.82rem;margin-left:8px">${nb} entrée${nb>1?'s':''}</span></div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:var(--green)">${fmtEur(total)}</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">${fmtEur(paye)} encaissé</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 14px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Tableau de bord</h2>
+    <div class="ch-stat-grid">
+      <div class="ch-stat"><div class="val">${fmtEur(totalCA)}</div><div class="lbl">Chiffre d'affaires</div></div>
+      <div class="ch-stat"><div class="val">${fmtEur(totalPaye)}</div><div class="lbl">Encaissé</div></div>
+      <div class="ch-stat orange"><div class="val">${fmtEur(totalAttente)}</div><div class="lbl">En attente</div></div>
+      <div class="ch-stat red"><div class="val">${fmtEur(totalCharges)}</div><div class="lbl">Charges</div></div>
+    </div>
+    <div class="ch-stat" style="margin-bottom:20px;background:${net>=0?'var(--green-dark, #166534)':'#7f1d1d'};color:#fff;border:none">
+      <div class="val" style="color:#fff;font-size:1.6rem">${fmtEur(net)}</div>
+      <div class="lbl" style="color:rgba(255,255,255,.8)">Résultat net (encaissé − charges)</div>
+    </div>
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Par activité</h2>
+    ${sectRows||'<p style="color:var(--text-muted)">Aucune donnée pour l\'instant.</p>'}`;
+}
+
+function renderCharlotSection(section) {
+  const cfg = {
+    contrats: {label:'Contrats de prestation', icon:'📋', singulier:'contrat'},
+    pensions: {label:'Pensions',               icon:'🐕', singulier:'pension'},
+    cours:    {label:"Cours d'éducation",       icon:'🎓', singulier:'cours'},
+    charges:  {label:'Charges',                 icon:'💸', singulier:'charge'},
+  }[section];
+  const list = (state.charlot[section]||[]).slice().sort((a,b)=>(b.date||b.dateDebut||'').localeCompare(a.date||a.dateDebut||''));
+  const isCharge = section==='charges';
+  const totalMontant = list.reduce((s,e)=>s+Number(e.montant||0),0);
+  const totalPaye    = !isCharge ? list.filter(e=>e.paye).reduce((s,e)=>s+Number(e.montant||0),0) : 0;
+  const rows = list.map(e => renderCharlotEntry(section, e)).join('');
+  const totalBlock = `
+    <div class="ch-section-total">
+      <div>Total : <strong>${fmtEur(totalMontant)}</strong></div>
+      ${!isCharge?`<div>Encaissé : <strong style="color:var(--green)">${fmtEur(totalPaye)}</strong> &nbsp;|&nbsp; En attente : <strong style="color:#f59e0b">${fmtEur(totalMontant-totalPaye)}</strong></div>`:''}
+    </div>`;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-size:1rem;font-weight:700;margin:0">${cfg.icon} ${cfg.label}</h2>
+      <button class="btn btn-primary btn-sm" onclick="openCharlotForm('${section}')">+ Ajouter</button>
+    </div>
+    ${list.length===0
+      ? `<div class="empty-state"><div class="icon">${cfg.icon}</div><p>Aucun ${cfg.singulier} pour l'instant.</p></div>`
+      : rows + totalBlock}`;
+}
+
+function renderCharlotEntry(section, e) {
+  const isCharge = section==='charges';
+  let title='', meta='';
+  if (section==='contrats') {
+    title = escHtml(e.client||'Sans nom');
+    meta  = [e.date?fmtDateFr(e.date):'', escHtml(e.description||'')].filter(Boolean).join(' · ');
+  } else if (section==='pensions') {
+    title = escHtml(e.client||'Sans nom') + (e.chien?` — <em>${escHtml(e.chien)}</em>`:'');
+    meta  = [e.dateDebut?`du ${fmtDateFr(e.dateDebut)} au ${fmtDateFr(e.dateFin)}`:'',(e.notes?escHtml(e.notes):'')].filter(Boolean).join(' · ');
+  } else if (section==='cours') {
+    title = escHtml(e.client||'Sans nom') + (e.chien?` — <em>${escHtml(e.chien)}</em>`:'');
+    meta  = [e.date?fmtDateFr(e.date):'', escHtml(e.typeCours||''), (e.notes?escHtml(e.notes):'')].filter(Boolean).join(' · ');
+  } else {
+    title = escHtml(e.description||'Charge');
+    meta  = [e.date?fmtDateFr(e.date):'', escHtml(e.categorie||'')].filter(Boolean).join(' · ');
+  }
+  const badgePaye = !isCharge ? `<span class="ch-badge-paye ${e.paye?'oui':'non'}" onclick="toggleCharlotPaye('${section}','${e.id}')">${e.paye?'✓ Payé':'⏳ En attente'}</span>` : '';
+  return `
+    <div class="ch-card">
+      <div class="ch-card-header">
+        <div style="flex:1">
+          <div style="font-weight:600">${title}</div>
+          ${meta?`<div class="ch-card-meta">${meta}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <div style="font-weight:700;font-size:1.05rem">${fmtEur(e.montant)}</div>
+          ${badgePaye}
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end">
+        <button class="btn btn-sm" style="color:#e53e3e;border-color:#e53e3e;background:none;font-size:.78rem" onclick="deleteCharlotEntry('${section}','${e.id}')">Supprimer</button>
+      </div>
+    </div>`;
+}
+
+function toggleCharlotPaye(section, id) {
+  const entry = (state.charlot[section]||[]).find(e=>e.id===id);
+  if (entry) { entry.paye = !entry.paye; save(); renderCharlotSpace(); }
+}
+
+function deleteCharlotEntry(section, id) {
+  if (!confirm('Supprimer cette entrée ?')) return;
+  state.charlot[section] = (state.charlot[section]||[]).filter(e=>e.id!==id);
+  save(); renderCharlotSpace();
+}
+
+function openCharlotForm(section) {
+  const today = todayISO();
+  let fields = '';
+  if (section==='contrats') {
+    fields = `
+      <div class="form-group"><label>Date</label><input type="date" id="ch-date" class="form-control" value="${today}"></div>
+      <div class="form-group"><label>Client</label><input type="text" id="ch-client" class="form-control" placeholder="Nom du client"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="ch-description" class="form-control" placeholder="Objet du contrat"></div>
+      <div class="form-group"><label>Montant (€)</label><input type="number" id="ch-montant" class="form-control" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label><input type="checkbox" id="ch-paye" style="margin-right:6px">Déjà payé</label></div>
+      <div class="form-group"><label>Notes</label><input type="text" id="ch-notes" class="form-control" placeholder="Optionnel"></div>`;
+  } else if (section==='pensions') {
+    fields = `
+      <div class="form-group"><label>Date début</label><input type="date" id="ch-dateDebut" class="form-control" value="${today}"></div>
+      <div class="form-group"><label>Date fin</label><input type="date" id="ch-dateFin" class="form-control" value="${today}"></div>
+      <div class="form-group"><label>Propriétaire</label><input type="text" id="ch-client" class="form-control" placeholder="Nom du propriétaire"></div>
+      <div class="form-group"><label>Nom du chien</label><input type="text" id="ch-chien" class="form-control" placeholder="Nom du chien"></div>
+      <div class="form-group"><label>Montant (€)</label><input type="number" id="ch-montant" class="form-control" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label><input type="checkbox" id="ch-paye" style="margin-right:6px">Déjà payé</label></div>
+      <div class="form-group"><label>Notes</label><input type="text" id="ch-notes" class="form-control" placeholder="Optionnel"></div>`;
+  } else if (section==='cours') {
+    fields = `
+      <div class="form-group"><label>Date</label><input type="date" id="ch-date" class="form-control" value="${today}"></div>
+      <div class="form-group"><label>Client</label><input type="text" id="ch-client" class="form-control" placeholder="Nom du propriétaire"></div>
+      <div class="form-group"><label>Nom du chien</label><input type="text" id="ch-chien" class="form-control" placeholder="Nom du chien"></div>
+      <div class="form-group"><label>Type de cours</label>
+        <select id="ch-typeCours" class="form-control">
+          <option>Individuel</option><option>Collectif</option><option>Comportement</option><option>Rappel</option><option>Autre</option>
+        </select></div>
+      <div class="form-group"><label>Montant (€)</label><input type="number" id="ch-montant" class="form-control" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label><input type="checkbox" id="ch-paye" style="margin-right:6px">Déjà payé</label></div>
+      <div class="form-group"><label>Notes</label><input type="text" id="ch-notes" class="form-control" placeholder="Optionnel"></div>`;
+  } else {
+    fields = `
+      <div class="form-group"><label>Date</label><input type="date" id="ch-date" class="form-control" value="${today}"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="ch-description" class="form-control" placeholder="Libellé de la charge"></div>
+      <div class="form-group"><label>Catégorie</label>
+        <select id="ch-categorie" class="form-control">
+          <option>Matériel</option><option>Déplacement</option><option>Formation</option><option>Assurance</option><option>Autre</option>
+        </select></div>
+      <div class="form-group"><label>Montant (€)</label><input type="number" id="ch-montant" class="form-control" min="0" step="0.01" placeholder="0.00"></div>`;
+  }
+  const labels = {contrats:'contrat',pensions:'pension',cours:'cours',charges:'charge'};
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 style="margin:0 0 16px;font-size:1.1rem">Nouveau ${labels[section]}</h2>
+    ${fields}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveCharlotEntry('${section}')">Enregistrer</button>
+    </div>`;
+  openModal();
+}
+
+function saveCharlotEntry(section) {
+  const g = id => { const el=document.getElementById(id); return el?el.value.trim():null; };
+  const gb = id => { const el=document.getElementById(id); return el?el.checked:false; };
+  const montant = parseFloat(g('ch-montant'))||0;
+  let entry = {id: uid(), montant};
+  if (section==='contrats') {
+    entry = {...entry, date:g('ch-date'), client:g('ch-client'), description:g('ch-description'), paye:gb('ch-paye'), notes:g('ch-notes')};
+  } else if (section==='pensions') {
+    entry = {...entry, dateDebut:g('ch-dateDebut'), dateFin:g('ch-dateFin'), client:g('ch-client'), chien:g('ch-chien'), paye:gb('ch-paye'), notes:g('ch-notes')};
+  } else if (section==='cours') {
+    entry = {...entry, date:g('ch-date'), client:g('ch-client'), chien:g('ch-chien'), typeCours:g('ch-typeCours'), paye:gb('ch-paye'), notes:g('ch-notes')};
+  } else {
+    entry = {...entry, date:g('ch-date'), description:g('ch-description'), categorie:g('ch-categorie')};
+  }
+  if (!state.charlot[section]) state.charlot[section] = [];
+  state.charlot[section].push(entry);
+  save(); closeModal(); renderCharlotSpace();
 }
 
 function renderNav() {
