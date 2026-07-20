@@ -961,7 +961,7 @@ function saveNewIngredients() {
 // ═══════════════════════════════════════════════════════
 // PLANNING
 // ═══════════════════════════════════════════════════════
-let _plannerView = 'week';
+let _plannerView = 'menu';
 function setPlannerView(v) { _plannerView = v; renderMain(); }
 
 function _plannerHeader(weekKey) {
@@ -972,8 +972,8 @@ function _plannerHeader(weekKey) {
     <h2 style="font-size:1.1rem;color:var(--green-dark);margin:0">📅 Planning</h2>
     <div style="display:flex;gap:6px;align-items:center">
       <div class="seg-tabs" style="margin:0;padding:3px;gap:3px">
-        <button class="seg-tab${_plannerView==='week'?' active':''}" onclick="setPlannerView('week')" style="padding:5px 12px;font-size:.8rem">📅 Par jours</button>
         <button class="seg-tab${_plannerView==='menu'?' active':''}" onclick="setPlannerView('menu')" style="padding:5px 12px;font-size:.8rem">📋 Menu</button>
+        <button class="seg-tab${_plannerView==='week'?' active':''}" onclick="setPlannerView('week')" style="padding:5px 12px;font-size:.8rem">📅 Par jours</button>
       </div>
       <button class="btn btn-outline btn-sm" onclick="clearWeek('${weekKey}')" title="Effacer la semaine">🗑</button>
     </div>
@@ -1122,17 +1122,30 @@ function clearSlot(weekKey, day, meal) {
 let _pickerTarget = null;
 function openRecipePicker(weekKey, day, meal) {
   _pickerTarget = {weekKey, day, meal};
-  const allRecipes = [...state.recipes].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
+  const freeIds = new Set(plan?.freeRecipes || []);
+  const freeRecipes = [...state.recipes].filter(r=>freeIds.has(r.id)).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const otherRecipes = [...state.recipes].filter(r=>!freeIds.has(r.id)).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const dayLabel = DAYS[DAYS_K.indexOf(day)] || day;
+  const mealIcons = {matin:'🌅',midi:'☀️',soir:'🌙'};
+  const freeSection = freeRecipes.length > 0 ? `
+    <div style="font-size:.75rem;font-weight:700;color:#6b48d0;margin-bottom:6px;padding:0 2px">📌 Déjà dans le menu de la semaine</div>
+    ${freeRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}',true)" style="border-color:#c4b5fd;background:#f3f0ff">
+      <div><div class="pi-name">${escHtml(r.name)}</div><div class="pi-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div></div>
+    </div>`).join('')}
+    ${otherRecipes.length > 0 ? `<div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin:10px 0 6px;padding:0 2px">Toutes les recettes</div>` : ''}
+  ` : '';
   const pc = document.getElementById('picker-content');
   pc.innerHTML = `
     <button class="modal-close" onclick="closePicker()">×</button>
-    <h2>Choisir une recette · ${DAYS.find((_,i)=>DAYS_K[i]===day)||day} ${meal}</h2>
+    <h2>${mealIcons[meal]||''} ${dayLabel}</h2>
     <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="recipe-picker" id="recipe-picker-list">
-      ${allRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}')">
+      ${freeSection}
+      ${otherRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="selectRecipe('${r.id}',false)">
         <div><div class="pi-name">${escHtml(r.name)}</div><div class="pi-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers. · ${r.tags.slice(0,3).join(', ')}</div></div>
       </div>`).join('')}
-      ${allRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette disponible. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
+      ${(freeRecipes.length+otherRecipes.length)===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette disponible. Ajoutez-en dans l\'onglet Recettes.</p></div>':''}
     </div>`;
   document.getElementById('picker-overlay').classList.add('open');
 }
@@ -1141,11 +1154,12 @@ function filterPicker(q) {
     el.style.display = el.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
   });
 }
-function selectRecipe(recipeId) {
+function selectRecipe(recipeId, wasFree=false) {
   const {weekKey,day,meal} = _pickerTarget;
   const plan = getOrCreatePlan(weekKey);
   if (!plan.days[day]) plan.days[day] = {};
   plan.days[day][meal] = recipeId;
+  if (wasFree && plan.freeRecipes) plan.freeRecipes = plan.freeRecipes.filter(id=>id!==recipeId);
   save(); closePicker(); render();
 }
 function closePicker() { document.getElementById('picker-overlay').classList.remove('open'); }
