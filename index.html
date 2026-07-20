@@ -1036,7 +1036,7 @@ function renderPlannerMenu(weekKey, ws) {
         const rid = plan.days[dk]?.[m.k];
         if (rid) {
           if (!recipeSlots[rid]) recipeSlots[rid] = [];
-          recipeSlots[rid].push({dayLabel: DAYS[i], dayIdx: i, meal: m.k});
+          recipeSlots[rid].push({dayLabel: DAYS[i], dayIdx: i, meal: m.k, dayKey: dk});
         }
       });
     });
@@ -1069,7 +1069,7 @@ function renderPlannerMenu(weekKey, ws) {
         if (s.meal === 'free') {
           return `<span style="font-size:.75rem;background:#f3f0ff;color:#6b48d0;border-radius:10px;padding:2px 9px;border:1px solid #c4b5fd;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">📌 Cette semaine <span onclick="removeFreeRecipe('${weekKey}','${rid}')" style="cursor:pointer;font-size:.85rem;opacity:.7;line-height:1" title="Retirer">×</span></span>`;
         }
-        return `<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);border-radius:10px;padding:2px 9px;border:1px solid var(--green);white-space:nowrap">${mealIcons[s.meal]} ${s.dayLabel}</span>`;
+        return `<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);border-radius:10px;padding:2px 9px;border:1px solid var(--green);white-space:nowrap;display:inline-flex;align-items:center;gap:4px">${mealIcons[s.meal]} ${s.dayLabel} <span onclick="removeDaySlot('${weekKey}','${s.dayKey}','${s.meal}')" style="cursor:pointer;font-size:.85rem;opacity:.7;line-height:1" title="Retirer ce créneau">×</span></span>`;
       }).join('');
       return `<div style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid ${isDone?'var(--green)':'var(--border)'};padding:13px 15px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;transition:.2s;opacity:${isDone?.65:1}">
         <input type="checkbox" ${isDone?'checked':''} onchange="toggleMealDone('${weekKey}','${rid}',this.checked)" style="width:22px;height:22px;accent-color:var(--green);flex-shrink:0;cursor:pointer;margin-top:3px">
@@ -1077,7 +1077,10 @@ function renderPlannerMenu(weekKey, ws) {
           <div style="font-weight:700;font-size:1rem;${isDone?'text-decoration:line-through;color:var(--text-muted);':''}cursor:pointer;margin-bottom:7px" onclick="openRecipeDetail('${rid}')">${escHtml(r.name)}</div>
           <div style="display:flex;flex-wrap:wrap;gap:5px">${tags}</div>
         </div>
-        <button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:.75rem" onclick="openRecipeDetail('${rid}')">📖</button>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;font-size:.75rem" onclick="openRecipeDetail('${rid}')">📖</button>
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;font-size:.75rem;color:#e53e3e;border-color:#e53e3e" onclick="removeFromMenu('${weekKey}','${rid}')" title="Retirer du menu">🗑</button>
+        </div>
       </div>`;
     }).join('');
 
@@ -1177,6 +1180,21 @@ function addFreeRecipe(weekKey, recipeId) {
 function removeFreeRecipe(weekKey, recipeId) {
   const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
   if (plan?.freeRecipes) plan.freeRecipes = plan.freeRecipes.filter(id=>id!==recipeId);
+  save(); renderMain();
+}
+
+function removeDaySlot(weekKey, dayKey, meal) {
+  const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
+  if (plan?.days[dayKey]) delete plan.days[dayKey][meal];
+  save(); renderMain();
+}
+
+function removeFromMenu(weekKey, recipeId) {
+  const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
+  if (!plan) return;
+  DAYS_K.forEach(dk => { MEALS.forEach(m => { if (plan.days[dk]?.[m.k] === recipeId) delete plan.days[dk][m.k]; }); });
+  if (plan.freeRecipes) plan.freeRecipes = plan.freeRecipes.filter(id=>id!==recipeId);
+  if (state.mealsDone?.[weekKey]) delete state.mealsDone[weekKey][recipeId];
   save(); renderMain();
 }
 
