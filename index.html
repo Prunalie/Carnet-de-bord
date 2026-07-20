@@ -1251,18 +1251,18 @@ function refreshPlanModalWeek() {
   const prevStates = {};
   DAYS_K.forEach(dk => {
     const ck = document.getElementById(`plan-ck-${dk}`);
-    const meal = document.querySelector(`input[name="plan-meal-r-${dk}"]:checked`)?.value;
-    if (ck) prevStates[dk] = {checked: ck.checked, meal: meal || defaultMeal};
+    const meals = MEALS.map(m => m.k).filter(mk => document.getElementById(`plan-meal-ck-${dk}-${mk}`)?.checked);
+    if (ck) prevStates[dk] = {checked: ck.checked, meals: meals.length ? meals : [defaultMeal]};
   });
   const grid = document.getElementById('plan-days-grid');
   if (grid) {
     grid.innerHTML = DAYS_K.map((dk, i) => {
       const dt = new Date(ws); dt.setDate(dt.getDate() + i);
       const isToday = dt.toDateString() === today.toDateString();
-      const st = prevStates[dk] || {checked: false, meal: defaultMeal};
+      const st = prevStates[dk] || {checked: false, meals: [defaultMeal]};
       const mealOpts = MEALS.map(m =>
         `<label style="display:flex;align-items:center;gap:3px;font-size:.78rem;cursor:pointer;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg)">
-          <input type="radio" name="plan-meal-r-${dk}" value="${m.k}" ${m.k===st.meal?'checked':''} style="accent-color:var(--green)"> ${m.label}
+          <input type="checkbox" id="plan-meal-ck-${dk}-${m.k}" value="${m.k}" ${st.meals.includes(m.k)?'checked':''} style="accent-color:var(--green)"> ${m.label}
         </label>`
       ).join('');
       return `<div style="display:flex;flex-direction:column;border-radius:8px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};background:${isToday?'var(--green-light)':'var(--card)'};overflow:hidden">
@@ -1292,11 +1292,15 @@ function confirmPlanRecipe() {
   const r = recipeById(_planRecipeId);
   const addedSlots = [];
   checkedDays.forEach(dk => {
-    const meal = document.querySelector(`input[name="plan-meal-r-${dk}"]:checked`)?.value || 'soir';
+    const checkedMeals = MEALS.map(m=>m.k).filter(mk => document.getElementById(`plan-meal-ck-${dk}-${mk}`)?.checked);
+    const meals = checkedMeals.length ? checkedMeals : ['soir'];
     if (!plan.days[dk]) plan.days[dk] = {};
-    plan.days[dk][meal] = _planRecipeId;
-    const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
-    addedSlots.push(`${DAYS[DAYS_K.indexOf(dk)]} ${mealLabel}`);
+    const dayLabel = DAYS[DAYS_K.indexOf(dk)];
+    meals.forEach(mk => {
+      plan.days[dk][mk] = _planRecipeId;
+      const mealLabel = MEALS.find(m=>m.k===mk)?.label || mk;
+      addedSlots.push(`${dayLabel} ${mealLabel}`);
+    });
   });
   if (addFree && !plan.freeRecipes.includes(_planRecipeId)) plan.freeRecipes.push(_planRecipeId);
   if (addFree) addedSlots.push('menu semaine');
