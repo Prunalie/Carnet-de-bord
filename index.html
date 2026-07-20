@@ -615,7 +615,8 @@ function ingCats() { return state.ingredientCats || INITIAL_INGREDIENT_CATS; }
 function recipeById(id) { return state.recipes.find(r => r.id===id); }
 function getOrCreatePlan(weekKey) {
   let plan = state.weeklyPlans.find(p => p.weekStart===weekKey);
-  if (!plan) { plan={weekStart:weekKey,days:{}}; state.weeklyPlans.push(plan); }
+  if (!plan) { plan={weekStart:weekKey,days:{},freeRecipes:[]}; state.weeklyPlans.push(plan); }
+  if (!plan.freeRecipes) plan.freeRecipes = [];
   return plan;
 }
 
@@ -1027,7 +1028,7 @@ function renderPlannerMenu(weekKey, ws) {
   if (!state.mealsDone[weekKey]) state.mealsDone[weekKey] = {};
   const done = state.mealsDone[weekKey];
 
-  // Collect recipe slots: recipeId -> [{dayLabel, mealKey}]
+  // Collect recipe slots: recipeId -> [{dayLabel, dayIdx, meal}]
   const recipeSlots = {};
   if (plan) {
     DAYS_K.forEach((dk, i) => {
@@ -1039,15 +1040,24 @@ function renderPlannerMenu(weekKey, ws) {
         }
       });
     });
+    // Free recipes (no day assigned)
+    (plan.freeRecipes || []).forEach(rid => {
+      if (!recipeSlots[rid]) recipeSlots[rid] = [];
+      recipeSlots[rid].push({dayLabel: 'Cette semaine', dayIdx: 99, meal: 'free'});
+    });
   }
 
   const entries = Object.entries(recipeSlots);
+  const addBtn = `<button class="btn btn-primary btn-sm" style="gap:5px" onclick="openFreeRecipePicker('${weekKey}')">➕ Ajouter</button>`;
 
   if (entries.length === 0) {
-    return _plannerHeader(weekKey) + `<div class="empty-state"><div class="icon">📅</div><p>Aucun repas planifié cette semaine.</p><p style="margin-top:8px;font-size:.9rem">Passez en vue <b>Par jours</b> pour ajouter des recettes.</p></div>`;
+    return _plannerHeader(weekKey) + `
+    <div style="margin-bottom:14px">${addBtn}</div>
+    <div class="empty-state"><div class="icon">📅</div><p>Aucun repas planifié cette semaine.</p><p style="margin-top:8px;font-size:.9rem">Ajoutez des recettes avec le bouton ci-dessus.</p></div>`;
   }
 
   const doneCount = entries.filter(([rid]) => done[rid]).length;
+  const freeSet = new Set(plan?.freeRecipes || []);
   const cards = entries
     .sort(([,a],[,b]) => a[0].dayIdx - b[0].dayIdx)
     .map(([rid, slots]) => {
@@ -1055,7 +1065,12 @@ function renderPlannerMenu(weekKey, ws) {
       if (!r) return '';
       const isDone = !!done[rid];
       slots.sort((a,b)=>a.dayIdx-b.dayIdx);
-      const tags = slots.map(s=>`<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);border-radius:10px;padding:2px 9px;border:1px solid var(--green);white-space:nowrap">${mealIcons[s.meal]} ${s.dayLabel}</span>`).join('');
+      const tags = slots.map(s => {
+        if (s.meal === 'free') {
+          return `<span style="font-size:.75rem;background:#f3f0ff;color:#6b48d0;border-radius:10px;padding:2px 9px;border:1px solid #c4b5fd;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">📌 Cette semaine <span onclick="removeFreeRecipe('${weekKey}','${rid}')" style="cursor:pointer;font-size:.85rem;opacity:.7;line-height:1" title="Retirer">×</span></span>`;
+        }
+        return `<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);border-radius:10px;padding:2px 9px;border:1px solid var(--green);white-space:nowrap">${mealIcons[s.meal]} ${s.dayLabel}</span>`;
+      }).join('');
       return `<div style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid ${isDone?'var(--green)':'var(--border)'};padding:13px 15px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;transition:.2s;opacity:${isDone?.65:1}">
         <input type="checkbox" ${isDone?'checked':''} onchange="toggleMealDone('${weekKey}','${rid}',this.checked)" style="width:22px;height:22px;accent-color:var(--green);flex-shrink:0;cursor:pointer;margin-top:3px">
         <div style="flex:1;min-width:0">
@@ -1067,9 +1082,11 @@ function renderPlannerMenu(weekKey, ws) {
     }).join('');
 
   return _plannerHeader(weekKey) + `
-  <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+  <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <span>${doneCount}/${entries.length} recette${entries.length>1?'s':''} réalisée${doneCount>1?'s':''}</span>
     ${doneCount>0?`<button class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:.75rem" onclick="resetMealsDone('${weekKey}')">↺ Réinitialiser</button>`:''}
+    <span style="flex:1"></span>
+    ${addBtn}
   </div>
   ${cards}`;
 }
@@ -1129,6 +1146,40 @@ function selectRecipe(recipeId) {
 }
 function closePicker() { document.getElementById('picker-overlay').classList.remove('open'); }
 
+function openFreeRecipePicker(weekKey) {
+  const allRecipes = [...state.recipes].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const pc = document.getElementById('picker-content');
+  pc.innerHTML = `
+    <button class="modal-close" onclick="closePicker()">×</button>
+    <h2>➕ Ajouter au menu de la semaine</h2>
+    <input class="search-box" style="width:100%;margin-bottom:12px" type="text" placeholder="🔍 Rechercher…" oninput="filterPicker(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">
+    <div class="recipe-picker" id="recipe-picker-list">
+      ${allRecipes.map(r=>`<div class="picker-item" data-name="${escHtml(r.name.toLowerCase())}" onclick="addFreeRecipe('${weekKey}','${r.id}')">
+        <div><div class="pi-name">${escHtml(r.name)}</div><div class="pi-meta">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div></div>
+      </div>`).join('')}
+      ${allRecipes.length===0?'<div class="empty-state" style="padding:20px"><p>Aucune recette disponible.</p></div>':''}
+    </div>`;
+  document.getElementById('picker-overlay').classList.add('open');
+}
+
+function addFreeRecipe(weekKey, recipeId) {
+  const plan = getOrCreatePlan(weekKey);
+  if (!plan.freeRecipes.includes(recipeId)) plan.freeRecipes.push(recipeId);
+  save(); closePicker(); renderMain();
+  const r = recipeById(recipeId);
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green-dark);color:#fff;padding:10px 20px;border-radius:20px;font-size:.88rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  t.textContent = `✅ ${r?.name} → menu de la semaine`;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2800);
+}
+
+function removeFreeRecipe(weekKey, recipeId) {
+  const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
+  if (plan?.freeRecipes) plan.freeRecipes = plan.freeRecipes.filter(id=>id!==recipeId);
+  save(); renderMain();
+}
+
 let _planWeekOffset = 0;
 let _planRecipeId = null;
 
@@ -1148,9 +1199,9 @@ function openPlanFromRecipe(recipeId) {
       <button class="btn btn-outline btn-sm" onclick="shiftPlanWeek(1)">▶</button>
     </div>
     <div class="form-group"><label>Jour</label>
-      <select id="plan-day"></select>
+      <select id="plan-day" onchange="planDayChanged(this.value)"></select>
     </div>
-    <div class="form-group"><label>Repas</label>
+    <div class="form-group" id="plan-meal-group"><label>Repas</label>
       <select id="plan-meal">
         ${MEALS.map(m=>`<option value="${m.k}" ${m.k===defaultMeal?'selected':''}>${m.label}</option>`).join('')}
       </select>
@@ -1169,6 +1220,11 @@ function shiftPlanWeek(delta) {
   refreshPlanModalWeek();
 }
 
+function planDayChanged(val) {
+  const mg = document.getElementById('plan-meal-group');
+  if (mg) mg.style.display = val ? '' : 'none';
+}
+
 function refreshPlanModalWeek() {
   const ws = getWeekStart(_planWeekOffset);
   const we = new Date(ws); we.setDate(we.getDate()+6);
@@ -1176,30 +1232,40 @@ function refreshPlanModalWeek() {
   const today = new Date(); today.setHours(0,0,0,0);
   const sel = document.getElementById('plan-day');
   const prev = sel.value;
-  sel.innerHTML = DAYS_K.map((dk, i) => {
+  const dayOpts = DAYS_K.map((dk, i) => {
     const dt = new Date(ws); dt.setDate(dt.getDate() + i);
     const isToday = dt.toDateString() === today.toDateString();
-    const selected = prev ? prev === dk : isToday;
+    const selected = prev && prev !== '' ? prev === dk : (!prev && isToday);
     return `<option value="${dk}" ${selected?'selected':''}>${DAYS[i]} ${fmtDate(dt)}</option>`;
   }).join('');
+  sel.innerHTML = `<option value="">— Sans jour précis —</option>` + dayOpts;
+  if (prev === '') sel.value = '';
+  planDayChanged(sel.value);
   document.getElementById('plan-week-label').textContent = `${fmtDate(ws)} — ${fmtDate(we)}`;
   document.getElementById('plan-confirm-btn').dataset.weekkey = weekKey;
 }
 
 function confirmPlanRecipe() {
   const day = document.getElementById('plan-day').value;
-  const meal = document.getElementById('plan-meal').value;
   const weekKey = document.getElementById('plan-confirm-btn').dataset.weekkey;
   const plan = getOrCreatePlan(weekKey);
-  if (!plan.days[day]) plan.days[day] = {};
-  plan.days[day][meal] = _planRecipeId;
-  save(); closeModal();
   const r = recipeById(_planRecipeId);
-  const dayLabel = DAYS[DAYS_K.indexOf(day)];
-  const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
+  let toastMsg;
+  if (!day) {
+    if (!plan.freeRecipes.includes(_planRecipeId)) plan.freeRecipes.push(_planRecipeId);
+    toastMsg = `✅ ${r?.name} → menu de la semaine`;
+  } else {
+    const meal = document.getElementById('plan-meal').value;
+    if (!plan.days[day]) plan.days[day] = {};
+    plan.days[day][meal] = _planRecipeId;
+    const dayLabel = DAYS[DAYS_K.indexOf(day)];
+    const mealLabel = MEALS.find(m=>m.k===meal)?.label || meal;
+    toastMsg = `✅ ${r?.name} → ${dayLabel} ${mealLabel}`;
+  }
+  save(); closeModal();
   const t = document.createElement('div');
   t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green-dark);color:#fff;padding:10px 20px;border-radius:20px;font-size:.88rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3)';
-  t.textContent = `✅ ${r?.name} → ${dayLabel} ${mealLabel}`;
+  t.textContent = toastMsg;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(), 2800);
 }
