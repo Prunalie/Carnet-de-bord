@@ -440,6 +440,7 @@ function ensureStateFields() {
   // S'assurer que chaque ingrédient a un rayon
   state.masterIngredients.forEach(i => { if (!i.cat) i.cat = 'autre'; });
   if (!state.notes) state.notes = '';
+  if (!state.mealsDone) state.mealsDone = {};
   if (!state.dismissedItems) state.dismissedItems = {};
   if (!state.shoppingHistory) state.shoppingHistory = [];
 }
@@ -958,10 +959,39 @@ function saveNewIngredients() {
 // ═══════════════════════════════════════════════════════
 // PLANNING
 // ═══════════════════════════════════════════════════════
-function renderPlanner() {
+let _plannerView = 'week';
+function setPlannerView(v) { _plannerView = v; renderMain(); }
+
+function _plannerHeader(weekKey) {
   const ws = getWeekStart(weekOffset);
   const we = new Date(ws); we.setDate(we.getDate()+6);
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+    <h2 style="font-size:1.1rem;color:var(--green-dark);margin:0">📅 Planning</h2>
+    <div style="display:flex;gap:6px;align-items:center">
+      <div class="seg-tabs" style="margin:0;padding:3px;gap:3px">
+        <button class="seg-tab${_plannerView==='week'?' active':''}" onclick="setPlannerView('week')" style="padding:5px 12px;font-size:.8rem">📅 Par jours</button>
+        <button class="seg-tab${_plannerView==='menu'?' active':''}" onclick="setPlannerView('menu')" style="padding:5px 12px;font-size:.8rem">📋 Menu</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="clearWeek('${weekKey}')" title="Effacer la semaine">🗑</button>
+    </div>
+  </div>
+  <div class="week-nav">
+    <button onclick="weekOffset--;render()" style="font-size:1.2rem;padding:6px 16px">◀</button>
+    <span class="week-label" style="flex:1;text-align:center">${fmtDate(ws)} — ${fmtDate(we)}</span>
+    <button onclick="weekOffset++;render()" style="font-size:1.2rem;padding:6px 16px">▶</button>
+    <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Auj.</button>
+  </div>`;
+}
+
+function renderPlanner() {
+  const ws = getWeekStart(weekOffset);
   const weekKey = ws.toISOString().slice(0,10);
+  if (_plannerView === 'menu') return renderPlannerMenu(weekKey, ws);
+  return renderPlannerWeek(weekKey, ws);
+}
+
+function renderPlannerWeek(weekKey, ws) {
   const plan = getOrCreatePlan(weekKey);
   const today = new Date(); today.setHours(0,0,0,0);
   const mealIcons = {matin:'🌅',midi:'☀️',soir:'🌙'};
@@ -987,17 +1017,74 @@ function renderPlanner() {
       ${meals}
     </div>`;
   }).join('');
-  return `
-  <div class="section-header"><h2>📅 Planning</h2>
-    <button class="btn btn-outline btn-sm" onclick="clearWeek('${weekKey}')">🗑 Semaine</button>
+  return _plannerHeader(weekKey) + `<div class="planner-days">${days}</div>`;
+}
+
+function renderPlannerMenu(weekKey, ws) {
+  const mealIcons = {matin:'🌅',midi:'☀️',soir:'🌙'};
+  const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
+  if (!state.mealsDone) state.mealsDone = {};
+  if (!state.mealsDone[weekKey]) state.mealsDone[weekKey] = {};
+  const done = state.mealsDone[weekKey];
+
+  // Collect recipe slots: recipeId -> [{dayLabel, mealKey}]
+  const recipeSlots = {};
+  if (plan) {
+    DAYS_K.forEach((dk, i) => {
+      MEALS.forEach(m => {
+        const rid = plan.days[dk]?.[m.k];
+        if (rid) {
+          if (!recipeSlots[rid]) recipeSlots[rid] = [];
+          recipeSlots[rid].push({dayLabel: DAYS[i], dayIdx: i, meal: m.k});
+        }
+      });
+    });
+  }
+
+  const entries = Object.entries(recipeSlots);
+
+  if (entries.length === 0) {
+    return _plannerHeader(weekKey) + `<div class="empty-state"><div class="icon">📅</div><p>Aucun repas planifié cette semaine.</p><p style="margin-top:8px;font-size:.9rem">Passez en vue <b>Par jours</b> pour ajouter des recettes.</p></div>`;
+  }
+
+  const doneCount = entries.filter(([rid]) => done[rid]).length;
+  const cards = entries
+    .sort(([,a],[,b]) => a[0].dayIdx - b[0].dayIdx)
+    .map(([rid, slots]) => {
+      const r = recipeById(rid);
+      if (!r) return '';
+      const isDone = !!done[rid];
+      slots.sort((a,b)=>a.dayIdx-b.dayIdx);
+      const tags = slots.map(s=>`<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);border-radius:10px;padding:2px 9px;border:1px solid var(--green);white-space:nowrap">${mealIcons[s.meal]} ${s.dayLabel}</span>`).join('');
+      return `<div style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid ${isDone?'var(--green)':'var(--border)'};padding:13px 15px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;transition:.2s;opacity:${isDone?.65:1}">
+        <input type="checkbox" ${isDone?'checked':''} onchange="toggleMealDone('${weekKey}','${rid}',this.checked)" style="width:22px;height:22px;accent-color:var(--green);flex-shrink:0;cursor:pointer;margin-top:3px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:1rem;${isDone?'text-decoration:line-through;color:var(--text-muted);':''}cursor:pointer;margin-bottom:7px" onclick="openRecipeDetail('${rid}')">${escHtml(r.name)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${tags}</div>
+        </div>
+        <button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:.75rem" onclick="openRecipeDetail('${rid}')">📖</button>
+      </div>`;
+    }).join('');
+
+  return _plannerHeader(weekKey) + `
+  <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    <span>${doneCount}/${entries.length} recette${entries.length>1?'s':''} réalisée${doneCount>1?'s':''}</span>
+    ${doneCount>0?`<button class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:.75rem" onclick="resetMealsDone('${weekKey}')">↺ Réinitialiser</button>`:''}
   </div>
-  <div class="week-nav">
-    <button onclick="weekOffset--;render()" style="font-size:1.2rem;padding:6px 16px">◀</button>
-    <span class="week-label" style="flex:1;text-align:center">${fmtDate(ws)} — ${fmtDate(we)}</span>
-    <button onclick="weekOffset++;render()" style="font-size:1.2rem;padding:6px 16px">▶</button>
-    <button class="btn btn-outline btn-sm" onclick="weekOffset=0;render()">Auj.</button>
-  </div>
-  <div class="planner-days">${days}</div>`;
+  ${cards}`;
+}
+
+function toggleMealDone(weekKey, recipeId, val) {
+  if (!state.mealsDone) state.mealsDone = {};
+  if (!state.mealsDone[weekKey]) state.mealsDone[weekKey] = {};
+  if (val) state.mealsDone[weekKey][recipeId] = true;
+  else delete state.mealsDone[weekKey][recipeId];
+  save(); renderMain();
+}
+
+function resetMealsDone(weekKey) {
+  if (state.mealsDone) state.mealsDone[weekKey] = {};
+  save(); renderMain();
 }
 function clearWeek(weekKey) {
   if (!confirm('Effacer tout le planning de cette semaine ?')) return;
