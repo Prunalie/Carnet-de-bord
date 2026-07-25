@@ -1595,7 +1595,7 @@ function renderRecipes() {
     ${filterBtn('🥦 Végétarien','tag','végétarien')}${filterBtn('♨️ Four','tag','four')}${filterBtn('⚡ Rapide','tag','rapide')}
     ${f.mealType||f.season||f.tag||f.search?`<button class="filter-btn" onclick="clearFilters()" style="color:#B91C1C;border-color:#FECACA">✕ Effacer</button>`:''}
   </div>
-  <div id="recipe-cards-container"><div class="card-grid" id="recipe-card-grid">${state.recipes.map(r => `
+  <div id="recipe-cards-container"><div class="card-grid" id="recipe-card-grid">${recipes.map(r => `
     <div class="recipe-card" data-id="${r.id}" data-name="${escHtml(r.name.toLowerCase())}" data-mealtype="${r.mealType.join(',')}" data-season="${(r.season||[]).join(',')}" data-tags="${r.tags.join(',')}">
       <div class="rc-name" onclick="openRecipeDetail('${r.id}')">${escHtml(r.name)}</div>
       <div class="rc-meta" onclick="openRecipeDetail('${r.id}')">⏱ ${r.prepTime+r.cookTime} min · ${r.servings} pers.</div>
