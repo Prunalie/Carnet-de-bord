@@ -539,6 +539,62 @@ function sumQty(entries) {
   }).join(' + ');
 }
 
+// ═══════════════════════════════════════════════════════
+// ROUTAGE — History API (hash-based)
+// ═══════════════════════════════════════════════════════
+let _charlotAuthenticated = false;
+let _margotAuthenticated  = false;
+
+function navigate(hash) {
+  history.pushState({hash}, '', hash || '#');
+  dispatchHash(hash);
+}
+
+function dispatchHash(hash) {
+  hash = (hash || '#').replace(/^#\/?/, '');
+  const parts = hash.split('/').filter(Boolean);
+  const section = parts[0] || '';
+
+  if (section === '') {
+    document.body.classList.remove('maison-mode');
+    document.body.classList.add('portal-mode');
+    renderPortal();
+
+  } else if (section === 'famille') {
+    document.body.classList.remove('portal-mode', 'maison-mode');
+    activeTab = parts[1] || 'home';
+    render();
+
+  } else if (section === 'maison') {
+    document.body.classList.remove('portal-mode');
+    document.body.classList.add('maison-mode');
+    _activeListId = parts[1] || null;
+    renderMaisonApp();
+
+  } else if (section === 'animaux') {
+    document.body.classList.remove('maison-mode');
+    document.body.classList.add('portal-mode');
+    _animauxPet = parts[1] || null;
+    renderAnimauxSpace();
+
+  } else if (section === 'charlot') {
+    document.body.classList.remove('maison-mode');
+    document.body.classList.add('portal-mode');
+    if (!_charlotAuthenticated) { showPinPrompt('charlot'); return; }
+    _charlotTab    = parts[1] || 'home';
+    _charlotCoursId = (parts[1] === 'cours' && parts[2]) ? parts[2] : null;
+    renderCharlotSpace();
+
+  } else if (section === 'margot') {
+    document.body.classList.remove('maison-mode');
+    document.body.classList.add('portal-mode');
+    if (!_margotAuthenticated) { showPinPrompt('margot'); return; }
+    renderMargotSpace();
+  }
+}
+
+window.addEventListener('popstate', () => dispatchHash(window.location.hash));
+
 function loadFromStorage() {
   try {
     const saved = localStorage.getItem('carnet-recettes');
@@ -660,23 +716,9 @@ const NAV_TABS = [
   {id:'notes',     icon:'📝', label:'Notes'},
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
-function showPortal() {
-  document.body.classList.remove('maison-mode');
-  document.body.classList.add('portal-mode');
-  renderPortal();
-}
-function enterFamille(tab) {
-  activeTab = tab || 'home';
-  document.body.classList.remove('portal-mode');
-  document.body.classList.remove('maison-mode');
-  render();
-}
-function showMaison() {
-  _activeListId = null;
-  document.body.classList.remove('portal-mode');
-  document.body.classList.add('maison-mode');
-  renderMaisonApp();
-}
+function showPortal() { navigate('#'); }
+function enterFamille(tab) { navigate('#famille/' + (tab || 'home')); }
+function showMaison() { navigate('#maison'); }
 function renderMaisonApp() {
   const content = renderListes();
   document.getElementById('maison-app').innerHTML = `
@@ -734,7 +776,7 @@ function showPinPrompt(person) {
   document.getElementById('portal').innerHTML = `
     <div class="portal-hero">
       <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">←</button>
+        <button onclick="navigate('#')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">←</button>
         <div style="font-size:1.6rem">${avatar}</div>
         <div>
           <h1 style="font-size:1.2rem;font-weight:700;margin:0">Espace ${name}</h1>
@@ -779,7 +821,9 @@ function updatePinDots() {
 function checkPin() {
   updatePinDots();
   if (_pinValue === SPACE_PASSWORDS[_pinPerson]) {
-    enterPersonalSpace(_pinPerson);
+    if (_pinPerson === 'charlot') _charlotAuthenticated = true;
+    if (_pinPerson === 'margot')  _margotAuthenticated  = true;
+    navigate('#' + _pinPerson);
   } else {
     _pinValue = '';
     updatePinDots();
@@ -788,20 +832,18 @@ function checkPin() {
   }
 }
 
-function enterPersonalSpace(person) {
-  if (person === 'charlot') { _charlotTab = 'home'; renderCharlotSpace(); return; }
-  const name = 'Margot';
+function renderMargotSpace() {
   document.getElementById('portal').innerHTML = `
     <div class="portal-hero">
       <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
+        <button onclick="navigate('#')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
         <div style="font-size:1.6rem">👩</div>
-        <h1 style="font-size:1.2rem;font-weight:700;margin:0">Espace ${name}</h1>
+        <h1 style="font-size:1.2rem;font-weight:700;margin:0">Espace Margot</h1>
       </div>
     </div>
     <div style="padding:60px 20px;text-align:center">
       <div style="font-size:4rem;margin-bottom:16px">👩</div>
-      <h2 style="font-size:1.3rem;margin-bottom:8px">Bonjour ${name} !</h2>
+      <h2 style="font-size:1.3rem;margin-bottom:8px">Bonjour Margot !</h2>
       <p style="color:var(--text-muted)">Ton espace personnel arrive bientôt.</p>
     </div>`;
 }
@@ -819,7 +861,7 @@ const CH_TABS = [
   {id:'charges',    icon:'💸', label:'Charges'},
 ];
 
-function setCharlotTab(id) { _charlotTab = id; if(id!=='cours') _charlotCoursId=null; renderCharlotSpace(); }
+function setCharlotTab(id) { navigate('#charlot/' + id); }
 
 function renderCharlotSpace() {
   const nav = CH_TABS.map(t =>
@@ -835,7 +877,7 @@ function renderCharlotSpace() {
   if (_charlotTab==='charges')     content = renderCharlotCharges();
   document.getElementById('portal').innerHTML = `
     <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
-      <button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
+      <button onclick="navigate('#')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
       <span style="font-size:1.3rem">👦</span>
       <h1 style="font-size:1.1rem;font-weight:700;margin:0">Charlot</h1>
     </div>
@@ -995,7 +1037,7 @@ function renderCharlotCours() {
     const done = seances.filter(s=>s.realise).length;
     const reste = Math.max(0,(e.nbCours||0)-done);
     const pct = e.nbCours>0 ? Math.round(done/e.nbCours*100) : 0;
-    return `<div class="ch-card" style="cursor:pointer" onclick="_charlotCoursId='${e.id}';renderCharlotSpace()">
+    return `<div class="ch-card" style="cursor:pointer" onclick="navigate('#charlot/cours/${e.id}')">
       <div class="ch-card-header">
         <div style="flex:1">
           <div style="font-weight:600">${escHtml(e.client||'Sans nom')}${e.chien?` — <em>${escHtml(e.chien)}</em>`:''}</div>
@@ -1050,7 +1092,7 @@ function renderCharlotCoursDetail(contratId) {
       </div>
     </div>`).join('');
   return `
-    <button class="btn btn-outline btn-sm" style="margin-bottom:14px" onclick="_charlotCoursId=null;renderCharlotSpace()">← Retour aux contrats</button>
+    <button class="btn btn-outline btn-sm" style="margin-bottom:14px" onclick="navigate('#charlot/cours')">← Retour aux contrats</button>
     <div class="ch-card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div>
@@ -1127,8 +1169,8 @@ function toggleCharlotSeance(contratId, seanceId, val) {
 function deleteCharlotEntry(section, id) {
   if (!confirm('Supprimer cette entrée ?')) return;
   state.charlot[section] = (state.charlot[section]||[]).filter(e=>e.id!==id);
-  if (section==='cours') _charlotCoursId = null;
-  save(); renderCharlotSpace();
+  save();
+  if (section==='cours') { navigate('#charlot/cours'); } else { renderCharlotSpace(); }
 }
 function deleteCharlotSeance(contratId, seanceId) {
   if (!confirm('Supprimer cette séance ?')) return;
@@ -1238,8 +1280,7 @@ function saveCharlotEntry(section) {
   if (!state.charlot[section]) state.charlot[section]=[];
   state.charlot[section].push(entry);
   save(); closeModal();
-  if (section==='cours') { _charlotCoursId=entry.id; }
-  renderCharlotSpace();
+  if (section==='cours') { navigate('#charlot/cours/' + entry.id); } else { renderCharlotSpace(); }
 }
 
 function saveCharlotSeance(contratId) {
@@ -1265,18 +1306,13 @@ const COMMON_MEDS = [
 ];
 let _animauxPet = null;
 
-function showAnimaux() {
-  _animauxPet = null;
-  document.body.classList.remove('maison-mode');
-  document.body.classList.add('portal-mode');
-  renderAnimauxSpace();
-}
+function showAnimaux() { navigate('#animaux'); }
 
 function renderAnimauxSpace() {
   const content = _animauxPet ? renderPetDetail(_animauxPet) : renderAnimauxHome();
   const backBtn = _animauxPet
-    ? `<button onclick="_animauxPet=null;renderAnimauxSpace()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Animaux</button>`
-    : `<button onclick="renderPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>`;
+    ? `<button onclick="navigate('#animaux')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Animaux</button>`
+    : `<button onclick="navigate('#')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>`;
   const title = _animauxPet ? `${PETS.find(p=>p.key===_animauxPet)?.icon} ${PETS.find(p=>p.key===_animauxPet)?.name}` : '🐾 Animaux';
   document.getElementById('portal').innerHTML = `
     <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
@@ -1294,7 +1330,7 @@ function renderAnimauxHome() {
     const sub   = days !== null
       ? `Dernier médicament il y a <strong>${days} jour${days>1?'s':''}</strong> · ${escHtml(last.medicament)}`
       : `<span style="color:var(--text-muted)">Aucun médicament enregistré</span>`;
-    return `<div class="anim-pet-card" onclick="_animauxPet='${p.key}';renderAnimauxSpace()">
+    return `<div class="anim-pet-card" onclick="navigate('#animaux/${p.key}')">
       <div style="font-size:2.8rem;line-height:1">${p.icon}</div>
       <div>
         <div style="font-weight:700;font-size:1.15rem;margin-bottom:4px">${p.name}</div>
@@ -1406,7 +1442,7 @@ function renderNav() {
   document.getElementById('bottom-nav').innerHTML = btns;
   document.getElementById('sidebar-nav').innerHTML = btns;
 }
-function setTab(id) { activeTab = id; render(); }
+function setTab(id) { navigate('#famille/' + id); }
 
 // ═══════════════════════════════════════════════════════
 // UTILITAIRES
@@ -2794,7 +2830,7 @@ function renderListes() {
         </div>`).join('')}
     </div>`}`;
 }
-function openListe(id){_activeListId=id;renderMaisonApp();}
+function openListe(id){ navigate('#maison/' + id); }
 function renderListeDetail(listId) {
   const list=(state.customLists||[]).find(l=>l.id===listId);
   if(!list){_activeListId=null;return renderListes();}
@@ -2803,7 +2839,7 @@ function renderListeDetail(listId) {
   const done=items.filter(i=>i.done);
   return `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
-      <button class="btn btn-outline btn-sm" onclick="_activeListId=null;renderMaisonApp()">← Retour</button>
+      <button class="btn btn-outline btn-sm" onclick="navigate('#maison')">← Retour</button>
       <h2 style="font-size:1.15rem;color:var(--green-dark);margin:0;flex:1">${escHtml(list.icon||'📝')} ${escHtml(list.name)}</h2>
       <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteListeConfirm('${listId}')">🗑</button>
     </div>
@@ -2857,7 +2893,7 @@ function clearListeDone(listId) {
 function deleteListeConfirm(listId) {
   if(confirm('Supprimer cette liste et tous ses éléments ?')){
     state.customLists=(state.customLists||[]).filter(l=>l.id!==listId);
-    _activeListId=null; save(); renderMaisonApp();
+    save(); navigate('#maison');
   }
 }
 function openNewListeForm() {
@@ -2886,14 +2922,14 @@ function saveNewListe() {
   if(!state.customLists) state.customLists=[];
   const id=uid();
   state.customLists.push({id,name,icon,items:[]});
-  save(); closeModal(); _activeListId=id; renderMaisonApp();
+  save(); closeModal(); navigate('#maison/' + id);
 }
 
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 loadFromStorage(); // Affichage immédiat depuis le cache local
-showPortal();
+dispatchHash(window.location.hash || '#');
 initFirestore();  // Puis synchronisation avec Firebase
 </script>
 </body>
