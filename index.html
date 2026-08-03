@@ -2249,12 +2249,14 @@ function renderIngredients() {
   const mi = state.masterIngredients || [];
   const pantry = [...mi.filter(i=>i.type==='pantry')].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const shopping = [...mi.filter(i=>i.type==='shopping')].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const weekly = [...mi.filter(i=>i.type==='weekly')].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const pantryToBuy = pantry.filter(i=>i.needToBuy).length;
   const ingToBuy = shopping.filter(i=>i.needToBuy).length;
   const isPantry = _ingTab === 'pantry';
-  const items = isPantry ? pantry : shopping;
-  const accent = isPantry ? 'var(--amber)' : 'var(--green)';
-  const accentLight = isPantry ? 'var(--amber-light)' : 'var(--green-light)';
+  const isWeekly = _ingTab === 'weekly';
+  const items = isWeekly ? weekly : (isPantry ? pantry : shopping);
+  const accent = isWeekly ? 'var(--green-dark)' : (isPantry ? 'var(--amber)' : 'var(--green)');
+  const accentLight = isWeekly ? 'var(--green-light)' : (isPantry ? 'var(--amber-light)' : 'var(--green-light)');
 
   // Grouper par rayon
   const grouped = {};
@@ -2264,11 +2266,16 @@ function renderIngredients() {
   const renderItem = item => {
     const marked = item.needToBuy;
     const catSelectOpts = ingCats().map(c=>`<option value="${c.k}" ${(item.cat||'autre')===c.k?'selected':''}>${c.l}</option>`).join('');
-    return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${marked?`border-color:${accent};background:${accentLight};`:''}">
-      <input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
-      <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>
+    const typeBtnLabel = isWeekly ? '→ Placard' : (isPantry ? '→ Ponct.' : '→ Hebdo');
+    const leftCol = isWeekly
+      ? `<span style="font-size:1rem;flex-shrink:0" title="Ajouté automatiquement chaque semaine">🔁</span>
+         <span class="ing-name" style="font-weight:600">${escHtml(item.name)} <span style="font-size:.72rem;color:${accent}">chaque semaine</span></span>`
+      : `<input type="checkbox" ${marked?'checked':''} onchange="toggleMasterIngredient('${item.id}',this.checked)" style="accent-color:${accent};width:18px;height:18px;flex-shrink:0;cursor:pointer">
+         <span class="ing-name" style="font-weight:${marked?'700':'500'}" onclick="toggleMasterIngredient('${item.id}',${!marked})">${escHtml(item.name)}${marked?` <span style="font-size:.72rem;color:${accent}">→ courses</span>`:''}</span>`;
+    return `<div class="ing-item" data-name="${escHtml(item.name.toLowerCase())}" style="${(marked||isWeekly)?`border-color:${accent};background:${accentLight};`:''}">
+      ${leftCol}
       <select onchange="changeMasterIngCat('${item.id}',this.value)" style="border:1.5px solid var(--border);border-radius:6px;padding:3px 2px;font-size:.75rem;background:var(--card);cursor:pointer;max-width:130px;color:var(--text-muted)">${catSelectOpts}</select>
-      <button onclick="changeMasterIngType('${item.id}')" title="${isPantry?'Déplacer vers Ponctuels':'Déplacer vers Placard'}" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:.72rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;flex-shrink:0">${isPantry?'→ Ponct.':'→ Placard'}</button>
+      <button onclick="changeMasterIngType('${item.id}')" title="Changer de catégorie" style="background:none;border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:.72rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;flex-shrink:0">${typeBtnLabel}</button>
       <button class="del-btn" onclick="deleteMasterIngredient('${item.id}')">🗑</button>
     </div>`;
   };
@@ -2296,11 +2303,15 @@ function renderIngredients() {
       🫙 Placard <span style="font-weight:400;font-size:.78rem"> (${pantry.length})</span>
       ${pantryToBuy?`<span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${pantryToBuy}</span>`:''}
     </button>
-    <button class="seg-tab ${!isPantry?'active':''}" onclick="setIngTab('shopping')">
+    <button class="seg-tab ${_ingTab==='shopping'?'active':''}" onclick="setIngTab('shopping')">
       🛒 Ponctuels <span style="font-weight:400;font-size:.78rem"> (${shopping.length})</span>
       ${ingToBuy?`<span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:3px">${ingToBuy}</span>`:''}
     </button>
+    <button class="seg-tab ${isWeekly?'active':''}" onclick="setIngTab('weekly')">
+      🔁 Hebdo <span style="font-weight:400;font-size:.78rem"> (${weekly.length})</span>
+    </button>
   </div>
+  ${isWeekly?`<div style="background:var(--green-light);border-radius:var(--radius-sm);padding:9px 13px;font-size:.82rem;color:var(--green-dark);margin-bottom:12px">🔁 Ces ingrédients sont ajoutés <b>automatiquement</b> à la liste de courses chaque semaine.</div>`:''}
 
   <input type="search" class="search-box" placeholder="🔍 Rechercher…" oninput="filterIngredients(this.value)" style="width:100%;margin-bottom:14px" autocomplete="off" autocorrect="off">
 
@@ -2346,7 +2357,9 @@ function changeMasterIngCat(id, cat) {
 function changeMasterIngType(id) {
   const item = (state.masterIngredients||[]).find(i=>i.id===id);
   if (!item) return;
-  item.type = item.type === 'pantry' ? 'shopping' : 'pantry';
+  const cycle = {pantry:'shopping', shopping:'weekly', weekly:'pantry'};
+  item.type = cycle[item.type] || 'pantry';
+  if (item.type === 'weekly') item.needToBuy = false;
   save(); renderMain();
 }
 
@@ -2370,6 +2383,7 @@ function openAddMasterIngredient(defaultType, defaultCat) {
       <select id="new-mi-type">
         <option value="pantry" ${defaultType==='pantry'?'selected':''}>🫙 Placard (toujours en stock)</option>
         <option value="shopping" ${defaultType==='shopping'?'selected':''}>🛒 Ponctuel (à acheter)</option>
+        <option value="weekly" ${defaultType==='weekly'?'selected':''}>🔁 Hebdo (chaque semaine)</option>
       </select>
     </div>
     <div id="mi-warn" style="display:none;background:var(--amber-light);border-radius:6px;padding:8px 12px;font-size:.83rem;color:#7a5000;margin-bottom:8px"></div>
@@ -2387,7 +2401,7 @@ function openAddMasterIngredient(defaultType, defaultCat) {
     if (found) {
       warn.style.display='block';
       const catLabel = ingCats().find(c=>c.k===found.cat)?.l || found.cat;
-      warn.textContent = `"${found.name}" existe déjà (${found.type==='pantry'?'Placard':'Ponctuel'} · ${catLabel}). Enregistrer mettra à jour rayon et type.`;
+      warn.textContent = `"${found.name}" existe déjà (${{pantry:'Placard',shopping:'Ponctuel',weekly:'Hebdo'}[found.type]||'Ponctuel'} · ${catLabel}). Enregistrer mettra à jour rayon et type.`;
       document.getElementById('new-mi-cat').value = found.cat || 'autre';
       document.getElementById('new-mi-type').value = found.type;
     } else { warn.style.display='none'; }
@@ -2612,6 +2626,13 @@ function renderShopping() {
     if (!allMap[norm]) allMap[norm] = {name:item.name, cat:item.cat||'autre', type:'shopping', masterId:item.id, entries:[]};
   });
 
+  // 4. Ingrédients hebdomadaires — toujours présents, chaque semaine
+  (state.masterIngredients||[]).filter(i=>i.type==='weekly').forEach(item => {
+    const norm = normIngName(item.name);
+    if (allMap[norm]) { allMap[norm].weekly = true; }
+    else allMap[norm] = {name:item.name, cat:item.cat||'autre', type:'weekly', masterId:item.id, weekly:true, entries:[]};
+  });
+
   // Filtrer les éléments masqués
   const allItems = Object.values(allMap).filter(it => !dismissed[it.name.toLowerCase().trim()]);
 
@@ -2623,7 +2644,7 @@ function renderShopping() {
 
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
   const totalItems = allItems.length;
-  const doneCount = allItems.filter(it => it.type==='recipe' && !!checked[it.name.toLowerCase().trim()]).length;
+  const doneCount = allItems.filter(it => (it.type==='recipe'||it.type==='weekly') && !!checked[it.name.toLowerCase().trim()]).length;
 
   const weekNav = `<div class="week-nav">
     <button onclick="weekOffset--;render()">◀</button>
@@ -2635,12 +2656,12 @@ function renderShopping() {
   // ── Rendu d'un article ─────────────────────────────────
   const renderShopItem = it => {
     const key = it.name.toLowerCase().trim();
-    if (it.type === 'recipe') {
+    if (it.type === 'recipe' || it.type === 'weekly') {
       const isChecked = !!checked[key];
       const summary = it.entries.length ? sumQty(it.entries) : '';
       return `<div class="shop-item${isChecked?' checked':''}">
         <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
-        <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}
+        <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}${it.weekly?` <span style="font-size:.7rem;color:var(--green)">🔁 hebdo</span>`:''}
         </label>
         <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${key}')" title="Retirer sans historique">🗑</button>
       </div>`;
