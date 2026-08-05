@@ -1,0 +1,5 @@
+# Réglages locaux de Claude Code (spécifiques à cette machine)
+.claude/settings.local.json
+
+# Export de données (sauvegarde locale, ne pas publier)
+carnet-recettes.json
