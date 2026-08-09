@@ -93,6 +93,17 @@ textarea{resize:vertical;min-height:80px}
 #sidebar-nav button .ni{font-size:1.1rem;width:22px;text-align:center}
 .sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.12)}
 .sidebar-footer button{background:var(--amber);color:var(--green-dark);border:none;border-radius:var(--radius-sm);padding:8px 14px;cursor:pointer;font-size:.83rem;font-weight:600;width:100%}
+/* LISTES MAISON — lignes editables et deplacables */
+.li-row{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--green-light);background:var(--card);border-radius:8px}
+.li-handle{flex-shrink:0;width:26px;text-align:center;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;color:var(--text-muted);font-size:1.15rem;line-height:1;padding:6px 0;border-radius:6px}
+.li-spacer{flex-shrink:0;width:26px}
+.li-handle:hover{background:var(--green-light);color:var(--green-dark)}
+.li-handle:active{cursor:grabbing}
+.li-row.li-dragging{opacity:.95;box-shadow:0 6px 18px rgba(0,0,0,.2);border-bottom-color:transparent;position:relative;z-index:5}
+.li-text{flex:1;font-size:.93rem;cursor:pointer;word-break:break-word}
+.li-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.95rem;padding:5px 7px;border-radius:6px;line-height:1;flex-shrink:0}
+.li-btn:hover{background:var(--green-light)}
+.li-edit-input[type=text]{flex:1;width:auto;min-width:0;font-size:.93rem;padding:6px 9px}
 /* RESPONSIVE */
 @media(min-width:768px){
   #bottom-nav{display:none}
@@ -569,6 +580,7 @@ function dispatchHash(hash) {
     document.body.classList.remove('portal-mode');
     document.body.classList.add('maison-mode');
     _activeListId = parts[1] || null;
+    _editingListItemId = null;
     renderMaisonApp();
 
   } else if (section === 'animaux') {
@@ -727,6 +739,11 @@ function renderMaisonApp() {
       <h1 style="font-size:1.1rem;font-weight:700;margin:0">🏠 Maison</h1>
     </div>
     <div style="padding:20px;max-width:800px;margin:0 auto">${content}</div>`;
+}
+// Les listes sont affichées soit dans l'espace Maison, soit dans un onglet du carnet.
+function refreshMaison() {
+  if (document.body.classList.contains('maison-mode')) renderMaisonApp();
+  else renderMain();
 }
 function renderPortal() {
   document.getElementById('portal').innerHTML = `
@@ -2864,30 +2881,63 @@ function renderListeDetail(listId) {
       <h2 style="font-size:1.15rem;color:var(--green-dark);margin:0;flex:1">${escHtml(list.icon||'📝')} ${escHtml(list.name)}</h2>
       <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteListeConfirm('${listId}')">🗑</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:18px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <input id="new-list-item" class="search-box" style="flex:1;margin:0" placeholder="Ajouter un élément…" onkeydown="if(event.key==='Enter')addListeItem('${listId}')">
       <button class="btn btn-primary" onclick="addListeItem('${listId}')">+</button>
     </div>
+    ${pending.length>0?`<p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">✏️ pour modifier (Entrée pour valider)${pending.length>1?` · ⠿ à glisser pour changer l'ordre`:''}</p>`:'<div style="height:10px"></div>'}
     ${pending.length===0&&done.length===0?`<div class="empty-state" style="padding:30px 0"><p>Liste vide. Ajoutez votre premier élément !</p></div>`:''}
-    <div style="display:flex;flex-direction:column">
-      ${pending.map(i=>`
-        <label style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--green-light);cursor:pointer">
-          <input type="checkbox" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="toggleListeItem('${listId}','${i.id}',this.checked)">
-          <span style="flex:1;font-size:.93rem">${escHtml(i.text)}</span>
-          <button onclick="event.stopPropagation();event.preventDefault();deleteListeItem('${listId}','${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px 6px">✕</button>
-        </label>`).join('')}
+    <div id="liste-items" data-list-id="${listId}" style="display:flex;flex-direction:column">
+      ${pending.map(i=>renderListeItemRow(listId,i,true)).join('')}
     </div>
     ${done.length>0?`
       <div style="margin-top:18px;color:var(--text-muted);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">✅ Terminé (${done.length})</div>
       <div style="display:flex;flex-direction:column;opacity:.65">
-        ${done.map(i=>`
-          <label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--green-light);cursor:pointer">
-            <input type="checkbox" checked style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="toggleListeItem('${listId}','${i.id}',this.checked)">
-            <span style="flex:1;font-size:.93rem;text-decoration:line-through;color:var(--text-muted)">${escHtml(i.text)}</span>
-            <button onclick="event.stopPropagation();event.preventDefault();deleteListeItem('${listId}','${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px 6px">✕</button>
-          </label>`).join('')}
+        ${done.map(i=>renderListeItemRow(listId,i,false)).join('')}
       </div>
       <button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="clearListeDone('${listId}')">🗑 Effacer les éléments terminés</button>`:''}`;
+}
+function renderListeItemRow(listId, item, movable) {
+  if (_editingListItemId === item.id) {
+    return `<div class="li-row" data-item-id="${item.id}">
+      <span class="li-spacer"></span>
+      <input type="text" id="edit-item-input" class="li-edit-input" value="${escHtml(item.text)}"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();saveEditListeItem('${listId}','${item.id}')}else if(event.key==='Escape'){event.preventDefault();cancelEditListeItem()}"
+        onblur="saveEditListeItem('${listId}','${item.id}')">
+    </div>`;
+  }
+  return `<div class="li-row" data-item-id="${item.id}">
+    ${movable?`<span class="li-handle" data-drag-handle title="Glisser pour déplacer">⠿</span>`:'<span class="li-spacer"></span>'}
+    <input type="checkbox" ${item.done?'checked':''} style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="toggleListeItem('${listId}','${item.id}',this.checked)">
+    <span class="li-text"${item.done?' style="text-decoration:line-through;color:var(--text-muted)"':''} onclick="toggleListeItem('${listId}','${item.id}',${!item.done})">${escHtml(item.text)}</span>
+    <button class="li-btn" title="Modifier" onclick="startEditListeItem('${item.id}')">✏️</button>
+    <button class="li-btn" title="Supprimer" onclick="deleteListeItem('${listId}','${item.id}')">✕</button>
+  </div>`;
+}
+
+// ── Modification d'un élément ──────────────────────────
+let _editingListItemId = null;
+function startEditListeItem(itemId) {
+  _editingListItemId = itemId;
+  refreshMaison();
+  const el = document.getElementById('edit-item-input');
+  if (el) { el.focus(); el.select(); }
+}
+function saveEditListeItem(listId, itemId) {
+  // Le blur qui suit une validation ou une annulation ne doit rien réenregistrer.
+  if (_editingListItemId !== itemId) return;
+  const el = document.getElementById('edit-item-input');
+  if (!el) return;
+  const text = el.value.trim();
+  _editingListItemId = null;
+  const list = (state.customLists||[]).find(l=>l.id===listId);
+  const item = list?.items?.find(i=>i.id===itemId);
+  if (item && text && text !== item.text) { item.text = text; save(); }
+  refreshMaison();
+}
+function cancelEditListeItem() {
+  _editingListItemId = null;
+  refreshMaison();
 }
 function addListeItem(listId) {
   const input=document.getElementById('new-list-item');
@@ -2895,21 +2945,90 @@ function addListeItem(listId) {
   const list=(state.customLists||[]).find(l=>l.id===listId); if(!list) return;
   if(!list.items) list.items=[];
   list.items.push({id:uid(),text,done:false});
-  save(); input.value=''; renderMaisonApp();
+  _editingListItemId=null;
+  save(); input.value=''; refreshMaison();
   document.getElementById('new-list-item')?.focus();
 }
 function toggleListeItem(listId,itemId,done) {
   const list=(state.customLists||[]).find(l=>l.id===listId);
   const item=list?.items?.find(i=>i.id===itemId);
-  if(item){item.done=done;save();renderMaisonApp();}
+  if(item){item.done=done;_editingListItemId=null;save();refreshMaison();}
 }
 function deleteListeItem(listId,itemId) {
   const list=(state.customLists||[]).find(l=>l.id===listId);
-  if(list?.items){list.items=list.items.filter(i=>i.id!==itemId);save();renderMaisonApp();}
+  if(list?.items){list.items=list.items.filter(i=>i.id!==itemId);_editingListItemId=null;save();refreshMaison();}
 }
 function clearListeDone(listId) {
   const list=(state.customLists||[]).find(l=>l.id===listId);
-  if(list?.items){list.items=list.items.filter(i=>!i.done);save();renderMaisonApp();}
+  if(list?.items){list.items=list.items.filter(i=>!i.done);save();refreshMaison();}
+}
+
+// ── Réorganisation manuelle (glisser-déposer, souris + tactile) ──
+let _liDrag = null;
+function initListeDrag() {
+  document.addEventListener('pointerdown', e => {
+    const handle = e.target?.closest?.('[data-drag-handle]');
+    if (!handle) return;
+    const row = handle.closest('[data-item-id]');
+    const container = row?.parentElement;
+    if (!row || !container?.dataset?.listId) return;
+    e.preventDefault();
+    _liDrag = {row, container, listId:container.dataset.listId, pointerId:e.pointerId, y:e.clientY,
+               startOrder:_listeDomOrder(container)};
+    row.classList.add('li-dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch {}
+    requestAnimationFrame(_liDragTick);
+  });
+  document.addEventListener('pointermove', e => {
+    if (!_liDrag || e.pointerId !== _liDrag.pointerId) return;
+    e.preventDefault();
+    _liDrag.y = e.clientY;
+    _liDragPlace(e.clientY);
+  });
+  const end = e => {
+    if (!_liDrag || (e && e.pointerId !== _liDrag.pointerId)) return;
+    const {row, container, listId, startOrder} = _liDrag;
+    _liDrag = null;
+    row.classList.remove('li-dragging');
+    const order = _listeDomOrder(container);
+    if (order.join('|') === startOrder.join('|')) return;   // simple clic : rien à enregistrer
+    commitListeOrder(listId, order);
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+}
+function _listeDomOrder(container) {
+  return [...container.children].map(el=>el.dataset.itemId).filter(Boolean);
+}
+function _liDragPlace(y) {
+  if (!_liDrag) return;
+  const {row, container} = _liDrag;
+  let target = null;
+  for (const sib of container.children) {
+    if (sib === row || !sib.dataset.itemId) continue;
+    const r = sib.getBoundingClientRect();
+    if (y < r.top + r.height/2) { target = sib; break; }
+  }
+  if (target) { if (target.previousElementSibling !== row) container.insertBefore(row, target); }
+  else if (container.lastElementChild !== row) container.appendChild(row);
+}
+function _liDragTick() {
+  if (!_liDrag) return;
+  const y = _liDrag.y, margin = 80;
+  if (y < margin) { window.scrollBy(0, -Math.ceil((margin-y)/4)); _liDragPlace(y); }
+  else if (y > window.innerHeight - margin) { window.scrollBy(0, Math.ceil((y-(window.innerHeight-margin))/4)); _liDragPlace(y); }
+  requestAnimationFrame(_liDragTick);
+}
+function commitListeOrder(listId, order) {
+  const list = (state.customLists||[]).find(l=>l.id===listId);
+  if (!list?.items) return;
+  const byId = new Map(list.items.map(i=>[i.id,i]));
+  const moved = order.map(id=>byId.get(id)).filter(Boolean);
+  const movedIds = new Set(moved.map(i=>i.id));
+  let k = 0;
+  // On ne réordonne que les éléments déplacés : les autres gardent leur place.
+  list.items = list.items.map(i => movedIds.has(i.id) ? moved[k++] : i);
+  save(); refreshMaison();
 }
 function deleteListeConfirm(listId) {
   if(confirm('Supprimer cette liste et tous ses éléments ?')){
@@ -2950,6 +3069,7 @@ function saveNewListe() {
 // INIT
 // ═══════════════════════════════════════════════════════
 loadFromStorage(); // Affichage immédiat depuis le cache local
+initListeDrag();
 dispatchHash(window.location.hash || '#');
 initFirestore();  // Puis synchronisation avec Firebase
 </script>
