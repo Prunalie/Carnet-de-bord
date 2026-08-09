@@ -2856,7 +2856,7 @@ function renderListes() {
   const lists = state.customLists||[];
   return `
     <div class="section-header">
-      <button class="btn btn-primary btn-sm" onclick="openNewListeForm()">+ Nouvelle liste</button>
+      <button class="btn btn-primary btn-sm" onclick="openListeForm()">+ Nouvelle liste</button>
     </div>
     ${lists.length===0?`<div class="empty-state"><div class="icon">🏠</div><p>Aucune liste pour l'instant.<br>Créez votre première liste !</p></div>`:`
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
@@ -2878,7 +2878,8 @@ function renderListeDetail(listId) {
   return `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
       <button class="btn btn-outline btn-sm" onclick="navigate('#maison')">← Retour</button>
-      <h2 style="font-size:1.15rem;color:var(--green-dark);margin:0;flex:1">${escHtml(list.icon||'📝')} ${escHtml(list.name)}</h2>
+      <h2 style="font-size:1.15rem;color:var(--green-dark);margin:0;flex:1;cursor:pointer" title="Renommer la liste" onclick="openListeForm('${listId}')">${escHtml(list.icon||'📝')} ${escHtml(list.name)}</h2>
+      <button class="btn btn-outline btn-sm" title="Renommer la liste" onclick="openListeForm('${listId}')">✏️</button>
       <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteListeConfirm('${listId}')">🗑</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -3036,30 +3037,41 @@ function deleteListeConfirm(listId) {
     save(); navigate('#maison');
   }
 }
-function openNewListeForm() {
+// Même formulaire pour créer une liste et pour la renommer.
+function openListeForm(listId) {
+  const list = listId ? (state.customLists||[]).find(l=>l.id===listId) : null;
   const icons=['📝','✅','🛒','🔨','🌱','🏋️','📚','🎯','🧹','🎨','💡','⭐'];
+  const curIcon = list?.icon || '📝';
   document.getElementById('modal-content').innerHTML = `
     <button class="modal-close" onclick="closeModal()">×</button>
-    <h2>🏠 Nouvelle liste</h2>
+    <h2>🏠 ${list?'Renommer la liste':'Nouvelle liste'}</h2>
     <div class="form-group"><label>Icône</label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        ${icons.map(ic=>`<span onclick="document.getElementById('liste-icon').value='${ic}';document.querySelectorAll('.icon-opt').forEach(e=>e.style.background='none');this.style.background='var(--green-light)'" class="icon-opt" style="font-size:1.5rem;cursor:pointer;padding:5px 8px;border-radius:8px;border:2px solid var(--border)">${ic}</span>`).join('')}
+        ${icons.map(ic=>`<span onclick="document.getElementById('liste-icon').value='${ic}';document.querySelectorAll('.icon-opt').forEach(e=>e.style.background='none');this.style.background='var(--green-light)'" class="icon-opt" style="font-size:1.5rem;cursor:pointer;padding:5px 8px;border-radius:8px;border:2px solid var(--border);background:${ic===curIcon?'var(--green-light)':'none'}">${ic}</span>`).join('')}
       </div>
-      <input type="text" id="liste-icon" value="📝" placeholder="Emoji personnalisé" style="width:90px">
+      <input type="text" id="liste-icon" value="${escHtml(curIcon)}" placeholder="Emoji personnalisé" style="width:90px">
     </div>
-    <div class="form-group"><label>Nom de la liste *</label><input type="text" id="liste-name" placeholder="Ex : À faire, Jardinage…"></div>
+    <div class="form-group"><label>Nom de la liste *</label><input type="text" id="liste-name" value="${escHtml(list?.name||'')}" placeholder="Ex : À faire, Jardinage…" onkeydown="if(event.key==='Enter'){event.preventDefault();saveListeForm(${list?`'${listId}'`:''})}"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="saveNewListe()">Créer</button>
+      <button class="btn btn-primary" onclick="saveListeForm(${list?`'${listId}'`:''})">${list?'Enregistrer':'Créer'}</button>
     </div>`;
   openModal();
-  document.getElementById('liste-name').focus();
+  const nameInput = document.getElementById('liste-name');
+  nameInput.focus();
+  if (list) nameInput.select();
 }
-function saveNewListe() {
+function saveListeForm(listId) {
   const name=document.getElementById('liste-name')?.value?.trim();
   const icon=document.getElementById('liste-icon')?.value?.trim()||'📝';
   if(!name){alert('Donnez un nom à votre liste.');return;}
   if(!state.customLists) state.customLists=[];
+  const list = listId ? state.customLists.find(l=>l.id===listId) : null;
+  if (list) {
+    list.name = name; list.icon = icon;
+    save(); closeModal(); refreshMaison();
+    return;
+  }
   const id=uid();
   state.customLists.push({id,name,icon,items:[]});
   save(); closeModal(); navigate('#maison/' + id);
