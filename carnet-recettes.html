@@ -2705,15 +2705,23 @@ function renderShopping() {
   // Filtrer les éléments masqués
   const allItems = Object.values(allMap).filter(it => !dismissed[it.name.toLowerCase().trim()]);
 
-  // ── Groupement par rayon ──────────────────────────────
+  // ── Panier : ce qui est coché quitte la liste et descend en bas ──
+  const cartKey  = it => it.name.toLowerCase().trim();
+  const histCat  = it => it.type==='pantry' ? 'placard' : (it.type==='recipe'||it.type==='weekly' ? 'recette' : 'ingredient');
+  const maisonToBuy  = (state.maisonItems||[]).filter(i=>i.needToBuy);
+  const maisonToGet  = maisonToBuy.filter(m => !checked['maison:'+m.id]);
+  const maisonInCart = maisonToBuy.filter(m =>  checked['maison:'+m.id]);
+  const inCart   = allItems.filter(it =>  checked[cartKey(it)]);
+  const toGet    = allItems.filter(it => !checked[cartKey(it)]);
+  const cartCount   = inCart.length + maisonInCart.length;
+  const remaining   = toGet.length + maisonToGet.length;
+  const totalItems  = allItems.length + maisonToBuy.length;
+
+  // ── Groupement par rayon (ce qui reste à prendre) ──────
   const byRayon = {};
   ingCats().forEach(c => byRayon[c.k] = []);
-  allItems.forEach(it => (byRayon[it.cat]||byRayon['autre']).push(it));
+  toGet.forEach(it => (byRayon[it.cat]||byRayon['autre']).push(it));
   ingCats().forEach(c => byRayon[c.k].sort((a,b)=>a.name.localeCompare(b.name,'fr')));
-
-  const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy);
-  const totalItems = allItems.length;
-  const doneCount = allItems.filter(it => (it.type==='recipe'||it.type==='weekly') && !!checked[it.name.toLowerCase().trim()]).length;
 
   const weekNav = `<div class="week-nav">
     <button onclick="weekOffset--;render()">◀</button>
@@ -2723,37 +2731,61 @@ function renderShopping() {
   </div>`;
 
   // ── Rendu d'un article ─────────────────────────────────
-  const renderShopItem = it => {
-    const key = it.name.toLowerCase().trim();
-    const jsKey = escJs(key);
-    if (it.type === 'recipe' || it.type === 'weekly') {
-      const isChecked = !!checked[key];
-      const summary = it.entries.length ? sumQty(it.entries) : '';
-      return `<div class="shop-item${isChecked?' checked':''}">
-        <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${jsKey}',this.checked,this)">
-        <label onclick="toggleCheckLabel('${checkedKey}','${jsKey}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}${it.weekly?` <span style="font-size:.7rem;color:var(--green)">🔁 hebdo</span>`:''}
-        </label>
-        <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${jsKey}')" title="Retirer sans historique">🗑</button>
-      </div>`;
-    }
-    const isPantry = it.type==='pantry';
-    return `<div class="shop-item">
-      <input type="checkbox" onchange="buyMasterIngredient('${it.masterId}')" style="accent-color:${isPantry?'var(--amber)':'var(--green)'};width:16px;height:16px;cursor:pointer">
-      <label style="flex:1;cursor:pointer" onclick="buyMasterIngredient('${it.masterId}')">${escHtml(it.name)} <span style="font-size:.7rem;color:var(--text-muted)">${isPantry?'🫙 placard':'🛒'}</span></label>
-      <button class="del-btn" onclick="toggleMasterIngredient('${it.masterId}',false)" title="Retirer de la liste">🗑</button>
+  // Cocher = « mis dans le panier ». Rien n'est validé tant qu'on n'a pas
+  // appuyé sur « Finir les courses » : on peut décocher à tout moment.
+  const renderShopItem = (it, cart) => {
+    const jsKey = escJs(cartKey(it));
+    const summary = it.entries?.length ? sumQty(it.entries) : '';
+    const badge = it.weekly ? ` <span style="font-size:.7rem;color:var(--green)">🔁 hebdo</span>`
+                : it.type==='pantry' ? ` <span style="font-size:.7rem;color:var(--text-muted)">🫙 placard</span>` : '';
+    const toggle = `toggleCartItem('${checkedKey}','${jsKey}',${cart?'false':'true'},'${escJs(it.name)}','${histCat(it)}')`;
+    const delBtn = (it.type==='pantry'||it.type==='shopping') && it.masterId
+      ? `<button class="del-btn" onclick="toggleMasterIngredient('${it.masterId}',false)" title="Retirer de la liste">🗑</button>`
+      : `<button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${jsKey}')" title="Retirer sans historique">🗑</button>`;
+    return `<div class="shop-item${cart?' checked':''}">
+      <input type="checkbox" ${cart?'checked':''} onchange="${toggle}">
+      <label onclick="${toggle}"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}${badge}</label>
+      ${cart?'':delBtn}
+    </div>`;
+  };
+  const renderMaisonShopItem = (item, cart) => {
+    const toggle = `toggleCartItem('${checkedKey}','maison:${item.id}',${cart?'false':'true'},'${escJs(item.name)}','maison')`;
+    return `<div class="shop-item${cart?' checked':''}">
+      <input type="checkbox" ${cart?'checked':''} onchange="${toggle}" style="accent-color:var(--amber)">
+      <label onclick="${toggle}">${escHtml(item.name)}</label>
+      ${cart?'':`<button class="del-btn" onclick="toggleMaisonItem('${item.id}',false)">🗑</button>`}
     </div>`;
   };
 
   // ── Section Maison ─────────────────────────────────────
-  const maisonSection = maisonToBuy.length>0 ? `
+  const maisonSection = maisonToGet.length>0 ? `
     <div class="card" style="margin-bottom:12px">
       <div style="font-weight:700;font-size:.83rem;color:var(--green-dark);padding:6px 0 5px;border-bottom:2px solid var(--amber-light);margin-bottom:4px">🏠 Produits maison</div>
-      ${maisonToBuy.map(item=>`
-      <div class="shop-item">
-        <input type="checkbox" onchange="buyMaisonItem('${item.id}')" style="accent-color:var(--amber);width:16px;height:16px;cursor:pointer">
-        <label style="flex:1;cursor:pointer" onclick="buyMaisonItem('${item.id}')">${escHtml(item.name)}</label>
-        <button class="del-btn" onclick="toggleMaisonItem('${item.id}',false)">🗑</button>
-      </div>`).join('')}
+      ${maisonToGet.map(item=>renderMaisonShopItem(item,false)).join('')}
+    </div>` : '';
+
+  // ── Section Panier ─────────────────────────────────────
+  // Seuls les articles présents parce qu'ils étaient cochés « à acheter »
+  // sont à valider : les ingrédients de recette, eux, restent liés au menu.
+  const commit = {
+    ck: checkedKey,
+    masters: inCart.filter(it => it.masterId &&
+        (state.masterIngredients||[]).find(i=>i.id===it.masterId)?.needToBuy)
+      .map(it => ({id:it.masterId, key:cartKey(it)})),
+    maison: maisonInCart.map(m => ({id:m.id, key:'maison:'+m.id})),
+  };
+  const commitCount = commit.masters.length + commit.maison.length;
+  const cartSection = cartCount>0 ? `
+    <div class="card" style="margin-top:14px;padding:12px 16px;border:1.5px solid var(--green-light)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+        <div style="font-weight:700;font-size:.9rem;color:var(--green-dark);flex:1">🛒 Dans le panier (${cartCount})</div>
+        ${commitCount?`<button class="btn btn-primary btn-sm" data-commit="${escHtml(JSON.stringify(commit))}" onclick="finishShopping(this)">✅ Finir les courses</button>`:''}
+      </div>
+      <p style="font-size:.76rem;color:var(--text-muted);margin-bottom:6px">Décochez un article pour le remonter dans la liste.</p>
+      <div style="opacity:.7">
+        ${inCart.map(it=>renderShopItem(it,true)).join('')}
+        ${maisonInCart.map(m=>renderMaisonShopItem(m,true)).join('')}
+      </div>
     </div>` : '';
 
   // ── Rayons alimentaires ────────────────────────────────
@@ -2762,13 +2794,13 @@ function renderShopping() {
     if (!catItems.length) return '';
     return `<div style="margin-bottom:14px">
       <div style="font-weight:700;font-size:.83rem;color:var(--green-dark);padding:5px 0;border-bottom:2px solid var(--green-light);margin-bottom:4px">${cat.l}</div>
-      ${catItems.map(renderShopItem).join('')}
+      ${catItems.map(it=>renderShopItem(it,false)).join('')}
     </div>`;
   }).join('');
 
   // ── Onglets Liste / Placard ────────────────────────────
   const segTabs = `<div class="seg-tabs">
-    <button class="seg-tab${_shoppingView==='list'?' active':''}" onclick="setShoppingView('list')">🛒 Liste${totalItems?` (${totalItems})`:''}</button>
+    <button class="seg-tab${_shoppingView==='list'?' active':''}" onclick="setShoppingView('list')">🛒 Liste${remaining?` (${remaining})`:''}</button>
     <button class="seg-tab${_shoppingView==='pantry'?' active':''}" onclick="setShoppingView('pantry')">🫙 Placard${pantryTodo.length?` (${pantryTodo.length})`:''}</button>
   </div>`;
 
@@ -2809,14 +2841,13 @@ function renderShopping() {
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
     ${weekNav}
     ${segTabs}
-    ${maisonSection}
-    ${!maisonToBuy.length?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Planifiez des repas ou cochez des articles dans <b>Ingrédients</b> et <b>Maison</b>.</p></div>`:''}
+    <div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Planifiez des repas ou cochez des articles dans <b>Ingrédients</b> et <b>Maison</b>.</p></div>
     ${renderHistorySection()}`;
 
   return `
   <div class="section-header">
     <h2>🛒 Courses — <span style="font-size:.85rem;font-weight:400;color:var(--text-muted)">${fmtDate(ws)} → ${fmtDate(we)}</span></h2>
-    <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
+    ${cartCount?`<button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Vider le panier</button>`:''}
   </div>
   ${weekNav}
   ${segTabs}
@@ -2826,12 +2857,13 @@ function renderShopping() {
   </div>`:''}
   ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:10px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
-    <span style="font-size:.88rem"><b>${recipeIds.size}</b> recette${recipeIds.size>1?'s':''} · <b>${totalItems}</b> articles · <b>${doneCount}</b> cochés</span>
+    <span style="font-size:.88rem"><b>${remaining}</b> à prendre · <b>${cartCount}</b> dans le panier</span>
     <span style="font-size:.78rem;color:var(--text-muted)">${[...recipeIds].map(id=>recipeById(id)?.name).filter(Boolean).join(' · ')}</span>
   </div>
-  <div class="card" style="padding:12px 16px">
-    ${rayonHTML}
-  </div>
+  ${remaining===0
+    ? `<div class="card" style="padding:22px 16px;text-align:center"><div style="font-size:1.6rem;margin-bottom:6px">🎉</div><p style="font-size:.92rem;color:var(--text-muted)">Tout est dans le panier !</p></div>`
+    : `<div class="card" style="padding:12px 16px">${rayonHTML}</div>`}
+  ${cartSection}
   ${renderHistorySection()}`;
 }
 // ── Vérification du placard, semaine par semaine ────────
@@ -2849,20 +2881,41 @@ function pantryUndo(weekKey, norm) {
 function pantryRebuy(masterId) {
   toggleMasterIngredient(masterId, true);   // enregistre et réaffiche
 }
-function toggleCheck(checkedKey, key, val, el) {
+// Cocher un article = le mettre dans le panier ; décocher = le remonter.
+// Rien n'est validé avant « Finir les courses ».
+function toggleCartItem(checkedKey, key, val, name, cat) {
+  if (!state.checkedItems) state.checkedItems = {};
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey]={};
-  if (val) { state.checkedItems[checkedKey][key]=true; addToHistory(key, 'bought', 'recette'); }
-  else delete state.checkedItems[checkedKey][key];
-  save();
-  const item = el?.closest('.shop-item');
-  if (item) item.className = 'shop-item' + (val?' checked':'');
-}
-function toggleCheckLabel(checkedKey, key) {
-  if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey]={};
-  const v = !state.checkedItems[checkedKey][key];
-  if (v) state.checkedItems[checkedKey][key]=true;
-  else delete state.checkedItems[checkedKey][key];
+  if (val) { state.checkedItems[checkedKey][key]=true; addToHistory(name||key, 'bought', cat||'recette'); }
+  else { delete state.checkedItems[checkedKey][key]; removeLastHistory(name||key, 'bought'); }
   save(); renderMain();
+}
+// Sortir un article du panier annule l'entrée d'historique correspondante.
+function removeLastHistory(item, action) {
+  const h = state.shoppingHistory || [];
+  const i = h.findIndex(e => e.item === item && e.action === action);
+  if (i >= 0) h.splice(i, 1);
+}
+// Validation finale : les ingrédients et produits du panier ne sont plus
+// « à acheter », et le panier se vide.
+function finishShopping(btn) {
+  let d; try { d = JSON.parse(btn.dataset.commit); } catch { return; }
+  const n = d.masters.length + d.maison.length;
+  if (!n) return;
+  if (!confirm(`Finir les courses ?\n\n${n} article${n>1?'s':''} du panier ${n>1?'seront':'sera'} validé${n>1?'s':''} et ${n>1?'retirés':'retiré'} de la liste.`)) return;
+  const checked = state.checkedItems?.[d.ck] || {};
+  d.masters.forEach(({id,key}) => {
+    const item = (state.masterIngredients||[]).find(i=>i.id===id);
+    if (item) item.needToBuy = false;
+    delete checked[key];
+  });
+  d.maison.forEach(({id,key}) => {
+    const item = (state.maisonItems||[]).find(i=>i.id===id);
+    if (item) item.needToBuy = false;
+    delete checked[key];
+  });
+  save(); renderMain();
+  showToast('Courses terminées ✅');
 }
 function uncheckAll(checkedKey) { state.checkedItems[checkedKey]={}; save(); renderMain(); }
 function dismissShoppingItem(checkedKey, key) {
