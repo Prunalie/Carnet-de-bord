@@ -535,6 +535,11 @@ function ensureStateFields() {
 }
 
 function normIngName(n) { return (n||'').toLowerCase().trim().replace(/s$/,''); }
+// Texte insérable dans une chaîne JS d'un attribut onclick (apostrophes des noms d'ingrédients).
+function escJs(s) {
+  return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/[\r\n]+/g,' ');
+}
 function sumQty(entries) {
   const byUnit = {};
   entries.forEach(({q,u}) => {
@@ -1510,7 +1515,7 @@ function renderHome() {
   const ws = getWeekStart(0);
   const weekKey = ws.toISOString().slice(0,10);
   const plan = (state.weeklyPlans||[]).find(p=>p.weekStart===weekKey);
-  const plannedCount = plan ? Object.values(plan.days||{}).reduce((n,d)=>n+Object.keys(d).length,0) : 0;
+  const plannedCount = plan ? Object.values(plan.days||{}).reduce((n,d)=>n+Object.keys(d).length,0) + (plan.freeRecipes||[]).length : 0;
   const ingToBuy = (state.masterIngredients||[]).filter(i=>i.needToBuy).length;
   const maisonToBuy = (state.maisonItems||[]).filter(i=>i.needToBuy).length;
   const totalToBuy = ingToBuy + maisonToBuy;
@@ -2598,13 +2603,18 @@ function saveMaisonItem() {
 // ═══════════════════════════════════════════════════════
 // LISTE DE COURSES
 // ═══════════════════════════════════════════════════════
+let _shoppingView = 'list';
 function renderShopping() {
   const ws = getWeekStart(weekOffset);
   const weekKey = ws.toISOString().slice(0,10);
   const we = new Date(ws); we.setDate(we.getDate()+6);
   const plan = state.weeklyPlans.find(p=>p.weekStart===weekKey);
   const recipeIds = new Set();
-  if (plan) Object.values(plan.days).forEach(day => Object.values(day).forEach(id=>recipeIds.add(id)));
+  if (plan) {
+    Object.values(plan.days).forEach(day => Object.values(day).forEach(id=>recipeIds.add(id)));
+    // Recettes ajoutées à la semaine sans jour précis : elles comptent aussi.
+    (plan.freeRecipes||[]).forEach(id=>recipeIds.add(id));
+  }
 
   const checkedKey = `checked-${weekKey}`;
   if (!state.checkedItems) state.checkedItems = {};
@@ -2650,6 +2660,28 @@ function renderShopping() {
     else allMap[norm] = {name:item.name, cat:item.cat||'autre', type:'weekly', masterId:item.id, weekly:true, entries:[]};
   });
 
+  // ── Placard nécessaire aux recettes de la semaine ──────
+  // Ces ingrédients sont supposés déjà en stock : ils n'entrent pas dans la
+  // liste de courses, mais on veut pouvoir vérifier s'il en reste assez.
+  if (!state.pantryChecked) state.pantryChecked = {};
+  if (!state.pantryChecked[weekKey]) state.pantryChecked[weekKey] = {};
+  const pantryOk = state.pantryChecked[weekKey];
+  const pantryMap = {};
+  recipeIds.forEach(id => {
+    const r = recipeById(id); if (!r) return;
+    r.ingredients.forEach(ing => {
+      const norm = normIngName(ing.n);
+      const master = (state.masterIngredients||[]).find(p => normIngName(p.name)===norm);
+      if (master?.type !== 'pantry' || master.needToBuy) return;
+      if (!pantryMap[norm]) pantryMap[norm] = {norm, name:master.name, masterId:master.id, entries:[], recipes:[]};
+      pantryMap[norm].entries.push({q:ing.q, u:ing.u});
+      if (!pantryMap[norm].recipes.includes(r.name)) pantryMap[norm].recipes.push(r.name);
+    });
+  });
+  const pantryAll  = Object.values(pantryMap).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const pantryTodo = pantryAll.filter(p => !pantryOk[p.norm]);
+  const pantryDone = pantryAll.filter(p => pantryOk[p.norm]);
+
   // Filtrer les éléments masqués
   const allItems = Object.values(allMap).filter(it => !dismissed[it.name.toLowerCase().trim()]);
 
@@ -2673,14 +2705,15 @@ function renderShopping() {
   // ── Rendu d'un article ─────────────────────────────────
   const renderShopItem = it => {
     const key = it.name.toLowerCase().trim();
+    const jsKey = escJs(key);
     if (it.type === 'recipe' || it.type === 'weekly') {
       const isChecked = !!checked[key];
       const summary = it.entries.length ? sumQty(it.entries) : '';
       return `<div class="shop-item${isChecked?' checked':''}">
-        <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${key}',this.checked)">
-        <label onclick="toggleCheckLabel('${checkedKey}','${key}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}${it.weekly?` <span style="font-size:.7rem;color:var(--green)">🔁 hebdo</span>`:''}
+        <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck('${checkedKey}','${jsKey}',this.checked,this)">
+        <label onclick="toggleCheckLabel('${checkedKey}','${jsKey}')"><b>${escHtml(it.name)}</b>${summary?` <span style="color:var(--text-muted);font-size:.82rem">${escHtml(summary)}</span>`:''}${it.weekly?` <span style="font-size:.7rem;color:var(--green)">🔁 hebdo</span>`:''}
         </label>
-        <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${key}')" title="Retirer sans historique">🗑</button>
+        <button class="del-btn" onclick="dismissShoppingItem('${checkedKey}','${jsKey}')" title="Retirer sans historique">🗑</button>
       </div>`;
     }
     const isPantry = it.type==='pantry';
@@ -2713,9 +2746,49 @@ function renderShopping() {
     </div>`;
   }).join('');
 
+  // ── Onglets Liste / Placard ────────────────────────────
+  const segTabs = `<div class="seg-tabs">
+    <button class="seg-tab${_shoppingView==='list'?' active':''}" onclick="setShoppingView('list')">🛒 Liste${totalItems?` (${totalItems})`:''}</button>
+    <button class="seg-tab${_shoppingView==='pantry'?' active':''}" onclick="setShoppingView('pantry')">🫙 Placard${pantryTodo.length?` (${pantryTodo.length})`:''}</button>
+  </div>`;
+
+  if (_shoppingView === 'pantry') {
+    const pantryRow = p => `<div class="shop-item" style="align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:130px">
+        <div style="font-weight:600;font-size:.92rem">${escHtml(p.name)}${p.entries.length?` <span style="color:var(--text-muted);font-weight:400;font-size:.82rem">${escHtml(sumQty(p.entries))}</span>`:''}</div>
+        <div style="font-size:.74rem;color:var(--text-muted)">${escHtml(p.recipes.join(' · '))}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="pantryHave('${weekKey}','${escJs(p.norm)}')" title="J'en ai assez cette semaine">✔ J'en ai</button>
+      <button class="btn btn-primary btn-sm" onclick="pantryRebuy('${p.masterId}')" title="Ajouter à la liste de courses">🛒 À racheter</button>
+    </div>`;
+    const pantryBody = recipeIds.size===0
+      ? `<div class="empty-state" style="padding:30px 0"><div class="icon">🫙</div><p>Aucune recette pour cette semaine.</p><p style="margin-top:6px;font-size:.9rem">Planifiez des repas pour voir ce qu'il faut vérifier dans le placard.</p></div>`
+      : pantryAll.length===0
+      ? `<div class="empty-state" style="padding:30px 0"><div class="icon">✅</div><p>Aucun ingrédient du placard n'est utilisé par les recettes de cette semaine.</p></div>`
+      : `${pantryTodo.length?`<div class="card" style="padding:12px 16px;margin-bottom:12px">${pantryTodo.map(pantryRow).join('')}</div>`
+          :`<div class="card" style="padding:16px;margin-bottom:12px;text-align:center;color:var(--text-muted);font-size:.9rem">✅ Tout est vérifié pour cette semaine.</div>`}
+         ${pantryDone.length?`
+           <div style="color:var(--text-muted);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">✔ J'en ai (${pantryDone.length})</div>
+           <div class="card" style="padding:12px 16px;opacity:.7">
+             ${pantryDone.map(p=>`<div class="shop-item" style="gap:8px">
+               <label style="flex:1;font-size:.9rem">${escHtml(p.name)}</label>
+               <button class="btn btn-outline btn-sm" onclick="pantryUndo('${weekKey}','${escJs(p.norm)}')" title="Remettre à vérifier">↺</button>
+             </div>`).join('')}
+           </div>`:''}`;
+    return `
+    <div class="section-header">
+      <h2>🫙 Placard — <span style="font-size:.85rem;font-weight:400;color:var(--text-muted)">${fmtDate(ws)} → ${fmtDate(we)}</span></h2>
+    </div>
+    ${weekNav}
+    ${segTabs}
+    <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:12px">Les ingrédients « placard » de vos recettes de la semaine. Ils ne vont pas dans les courses tant que vous ne demandez pas à les racheter.</p>
+    ${pantryBody}`;
+  }
+
   if (totalItems===0) return `
     <div class="section-header"><h2>🛒 Liste de courses</h2></div>
     ${weekNav}
+    ${segTabs}
     ${maisonSection}
     ${!maisonToBuy.length?`<div class="empty-state"><div class="icon">🛒</div><p>Aucune recette planifiée et aucun article ajouté.</p><p style="margin-top:8px">Planifiez des repas ou cochez des articles dans <b>Ingrédients</b> et <b>Maison</b>.</p></div>`:''}
     ${renderHistorySection()}`;
@@ -2726,6 +2799,11 @@ function renderShopping() {
     <button class="btn btn-outline btn-sm" onclick="uncheckAll('${checkedKey}')">☐ Tout décocher</button>
   </div>
   ${weekNav}
+  ${segTabs}
+  ${pantryTodo.length?`<div class="card" style="margin-bottom:12px;padding:10px 14px;background:var(--amber-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:.85rem;flex:1">🫙 <b>${pantryTodo.length}</b> ingrédient${pantryTodo.length>1?'s':''} du placard à vérifier pour ces recettes.</span>
+    <button class="btn btn-outline btn-sm" onclick="setShoppingView('pantry')">Vérifier</button>
+  </div>`:''}
   ${maisonSection}
   <div class="card" style="margin-bottom:12px;padding:10px 16px;background:var(--green-light);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
     <span style="font-size:.88rem"><b>${recipeIds.size}</b> recette${recipeIds.size>1?'s':''} · <b>${totalItems}</b> articles · <b>${doneCount}</b> cochés</span>
@@ -2736,12 +2814,27 @@ function renderShopping() {
   </div>
   ${renderHistorySection()}`;
 }
-function toggleCheck(checkedKey, key, val) {
+// ── Vérification du placard, semaine par semaine ────────
+function setShoppingView(v) { _shoppingView = v; renderMain(); }
+function pantryHave(weekKey, norm) {
+  if (!state.pantryChecked) state.pantryChecked = {};
+  if (!state.pantryChecked[weekKey]) state.pantryChecked[weekKey] = {};
+  state.pantryChecked[weekKey][norm] = true;
+  save(); renderMain();
+}
+function pantryUndo(weekKey, norm) {
+  if (state.pantryChecked?.[weekKey]) delete state.pantryChecked[weekKey][norm];
+  save(); renderMain();
+}
+function pantryRebuy(masterId) {
+  toggleMasterIngredient(masterId, true);   // enregistre et réaffiche
+}
+function toggleCheck(checkedKey, key, val, el) {
   if (!state.checkedItems[checkedKey]) state.checkedItems[checkedKey]={};
   if (val) { state.checkedItems[checkedKey][key]=true; addToHistory(key, 'bought', 'recette'); }
   else delete state.checkedItems[checkedKey][key];
   save();
-  const item = document.querySelector(`.shop-item input[onchange*="${key}"]`)?.closest('.shop-item');
+  const item = el?.closest('.shop-item');
   if (item) item.className = 'shop-item' + (val?' checked':'');
 }
 function toggleCheckLabel(checkedKey, key) {
