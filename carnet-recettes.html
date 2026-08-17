@@ -586,21 +586,19 @@ function dispatchHash(hash) {
   } else if (section === 'famille') {
     document.body.classList.remove('portal-mode', 'maison-mode');
     activeTab = parts[1] || 'home';
+    if (activeTab === 'menage') {
+      _menageTab   = (parts[2] === 'astuces') ? 'astuces' : 'taches';
+      _menageTipId = parts[3] || null;
+    }
     render();
 
-  } else if (section === 'maison') {
+  } else if (section === 'maison' || section === 'listes') {
+    // Le ménage a déménagé dans l'espace Famille.
+    if (parts[1] === 'menage') { navigate('#famille/menage' + (parts[2]?'/'+parts[2]:'') + (parts[3]?'/'+parts[3]:'')); return; }
     document.body.classList.remove('portal-mode');
     document.body.classList.add('maison-mode');
     _editingListItemId = null;
-    if (parts[1] === 'menage') {
-      _maisonView = 'menage';
-      _menageTab  = (parts[2] === 'astuces') ? 'astuces' : 'taches';
-      _menageTipId = parts[3] || null;
-      _activeListId = null;
-    } else {
-      _maisonView = 'listes';
-      _activeListId = parts[1] || null;
-    }
+    _activeListId = parts[1] || null;
     renderMaisonApp();
 
   } else if (section === 'animaux') {
@@ -745,27 +743,20 @@ const NAV_TABS = [
   {id:'shopping',  icon:'🛒', label:'Courses'},
   {id:'ingredients',icon:'🥕',label:'Ingréd.'},
   {id:'maison',    icon:'🧴', label:'Maison'},
+  {id:'menage',    icon:'🧹', label:'Ménage'},
   {id:'notes',     icon:'📝', label:'Notes'},
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
 function showPortal() { navigate('#'); }
 function enterFamille(tab) { navigate('#famille/' + (tab || 'home')); }
 function showMaison() { navigate('#maison'); }
-let _maisonView = 'listes';
 function renderMaisonApp() {
-  const content = _maisonView === 'menage' ? renderMenage() : renderListes();
   document.getElementById('maison-app').innerHTML = `
     <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
       <button onclick="showPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
-      <h1 style="font-size:1.1rem;font-weight:700;margin:0">🏠 Maison</h1>
+      <h1 style="font-size:1.1rem;font-weight:700;margin:0">📋 Liste</h1>
     </div>
-    <div style="padding:20px;max-width:800px;margin:0 auto">
-      <div class="seg-tabs">
-        <button class="seg-tab${_maisonView==='listes'?' active':''}" onclick="navigate('#maison')">📋 Listes</button>
-        <button class="seg-tab${_maisonView==='menage'?' active':''}" onclick="navigate('#maison/menage')">🧹 Ménage${_menageLateCount()?` <span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem">${_menageLateCount()}</span>`:''}</button>
-      </div>
-      ${content}
-    </div>`;
+    <div style="padding:20px;max-width:800px;margin:0 auto">${renderListes()}</div>`;
 }
 // Les listes sont affichées soit dans l'espace Maison, soit dans un onglet du carnet.
 function refreshMaison() {
@@ -784,6 +775,16 @@ function renderPortal() {
       </div>
     </div>
     <div class="portal-cards">
+      <div class="portal-card" onclick="enterFamille('home')">
+        <div class="pc-avatar">👨‍👩‍👧</div>
+        <div class="pc-name">Famille</div>
+        <div class="portal-links">
+          <div class="portal-link" onclick="event.stopPropagation();enterFamille('home')"><span class="pl-icon">🍽️</span> Carnet de recettes</div>
+          <div class="portal-link" onclick="event.stopPropagation();enterFamille('menage')"><span class="pl-icon">🧹</span> Ménage</div>
+          <div class="portal-link" onclick="event.stopPropagation();showMaison()"><span class="pl-icon">📋</span> Liste</div>
+          <div class="portal-link" onclick="event.stopPropagation();showAnimaux()"><span class="pl-icon">🐾</span> Animaux</div>
+        </div>
+      </div>
       <div class="portal-card soon" onclick="showPinPrompt('margot')">
         <div class="pc-avatar">👩</div>
         <div class="pc-name">Margot</div>
@@ -795,15 +796,6 @@ function renderPortal() {
         <div class="pc-name">Charlot</div>
         <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
         <div class="pc-badge">🔒 Accès privé</div>
-      </div>
-      <div class="portal-card" onclick="enterFamille('home')">
-        <div class="pc-avatar">👨‍👩‍👧</div>
-        <div class="pc-name">Famille</div>
-        <div class="portal-links">
-          <div class="portal-link" onclick="event.stopPropagation();enterFamille('home')"><span class="pl-icon">🍽️</span> Carnet de recettes</div>
-          <div class="portal-link" onclick="event.stopPropagation();showMaison()"><span class="pl-icon">🏠</span> Maison</div>
-          <div class="portal-link" onclick="event.stopPropagation();showAnimaux()"><span class="pl-icon">🐾</span> Animaux</div>
-        </div>
       </div>
     </div>`;
 }
@@ -1537,6 +1529,7 @@ function render() {
   else if (activeTab==='shopping') main.innerHTML = renderShopping();
   else if (activeTab==='ingredients') main.innerHTML = renderIngredients();
   else if (activeTab==='maison') main.innerHTML = renderMaison();
+  else if (activeTab==='menage') main.innerHTML = renderMenage();
   else if (activeTab==='notes') main.innerHTML = renderNotes();
   else if (activeTab==='adresses') main.innerHTML = renderAdresses();
   else if (activeTab==='listes') main.innerHTML = renderListes();
@@ -1556,6 +1549,7 @@ function renderHome() {
     {tab:'shopping',   icon:'🛒', label:'Courses',     stat:`${totalToBuy} article${totalToBuy!==1?'s':''} à acheter`},
     {tab:'ingredients',icon:'🥕', label:'Ingrédients', stat:`${(state.masterIngredients||[]).length} ingrédients`},
     {tab:'maison',     icon:'🧴', label:'Maison',      stat:`${(state.maisonItems||[]).length} produits`},
+    {tab:'menage',     icon:'🧹', label:'Ménage',      stat:_menageLateCount()?`${_menageLateCount()} tâche${_menageLateCount()>1?'s':''} à faire`:`${(state.menageTasks||[]).length} tâches`},
     {tab:'profiles',   icon:'👤', label:'Profils',     stat:`${p1?.name||'Profil 1'} & ${p2?.name||'Profil 2'}`},
   ];
   return `
@@ -1695,6 +1689,7 @@ function renderMain() {
   else if (activeTab==='planner') m.innerHTML=renderPlanner();
   else if (activeTab==='ingredients') m.innerHTML=renderIngredients();
   else if (activeTab==='maison') m.innerHTML=renderMaison();
+  else if (activeTab==='menage') m.innerHTML=renderMenage();
   else if (activeTab==='notes') m.innerHTML=renderNotes();
   else if (activeTab==='adresses') m.innerHTML=renderAdresses();
   else if (activeTab==='listes') m.innerHTML=renderListes();
@@ -3317,8 +3312,8 @@ function renderMenage() {
 function _menageSubTabs() {
   const late = _menageLateCount();
   return `<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
-    <button class="btn btn-sm ${_menageTab==='taches'?'btn-primary':'btn-outline'}" onclick="navigate('#maison/menage')">📅 Tâches${late?` (${late})`:''}</button>
-    <button class="btn btn-sm ${_menageTab==='astuces'?'btn-primary':'btn-outline'}" onclick="navigate('#maison/menage/astuces')">💡 Astuces (${(state.menageTips||[]).length})</button>
+    <button class="btn btn-sm ${_menageTab==='taches'?'btn-primary':'btn-outline'}" onclick="navigate('#famille/menage')">📅 Tâches${late?` (${late})`:''}</button>
+    <button class="btn btn-sm ${_menageTab==='astuces'?'btn-primary':'btn-outline'}" onclick="navigate('#famille/menage/astuces')">💡 Astuces (${(state.menageTips||[]).length})</button>
   </div>`;
 }
 
@@ -3336,7 +3331,7 @@ function renderMenageTaches() {
       <div style="flex:1;min-width:140px">
         <div style="font-weight:600;font-size:.93rem">${escHtml(t.name)}</div>
         <div style="font-size:.75rem;color:var(--text-muted)">${zoneLabel(t.zone)} · ${escHtml(freqLabel(t.everyDays))} · <span style="color:${st.color};font-weight:600">${st.txt}</span></div>
-        ${tip?`<div style="font-size:.74rem;margin-top:2px"><span style="cursor:pointer;color:var(--green-dark);text-decoration:underline" onclick="navigate('#maison/menage/astuces/${tip.id}')">💡 ${escHtml(tip.title)}</span></div>`:''}
+        ${tip?`<div style="font-size:.74rem;margin-top:2px"><span style="cursor:pointer;color:var(--green-dark);text-decoration:underline" onclick="navigate('#famille/menage/astuces/${tip.id}')">💡 ${escHtml(tip.title)}</span></div>`:''}
       </div>
       <button class="btn btn-primary btn-sm" onclick="taskDoneNow('${t.id}')" title="Marquer comme faite aujourd'hui">✅ Fait</button>
       <button class="btn btn-outline btn-sm" onclick="openTaskForm('${t.id}')" title="Modifier">✏️</button>
@@ -3459,7 +3454,7 @@ function renderMenageAstuces() {
              <div style="font-weight:700;font-size:.8rem;color:var(--text-muted);letter-spacing:.04em;padding:6px 0 5px;border-bottom:1.5px solid var(--border);margin-bottom:8px">${z.l}</div>
              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
                ${byZone[z.k].map(t=>`
-                 <div class="tip-card" data-search="${escHtml((t.title+' '+(t.products||[]).join(' ')+' '+(t.notes||'')).toLowerCase())}" onclick="navigate('#maison/menage/astuces/${t.id}')" style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:13px 14px;cursor:pointer">
+                 <div class="tip-card" data-search="${escHtml((t.title+' '+(t.products||[]).join(' ')+' '+(t.notes||'')).toLowerCase())}" onclick="navigate('#famille/menage/astuces/${t.id}')" style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:13px 14px;cursor:pointer">
                    <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">${escHtml(t.title)}</div>
                    <div style="font-size:.75rem;color:var(--text-muted)">${(t.products||[]).length?escHtml((t.products||[]).slice(0,3).join(' · ')):'—'}</div>
                  </div>`).join('')}
@@ -3484,7 +3479,7 @@ function renderTipDetail(tipId) {
   if (!t) { _menageTipId = null; return renderMenageAstuces(); }
   return `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-outline btn-sm" onclick="navigate('#maison/menage/astuces')">← Retour</button>
+      <button class="btn btn-outline btn-sm" onclick="navigate('#famille/menage/astuces')">← Retour</button>
       <h2 style="font-size:1.1rem;color:var(--green-dark);margin:0;flex:1">${escHtml(t.title)}</h2>
       <button class="btn btn-outline btn-sm" onclick="openTipForm('${t.id}')" title="Modifier">✏️</button>
       <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteTip('${t.id}')" title="Supprimer">🗑</button>
@@ -3512,7 +3507,7 @@ function deleteTip(id) {
   if (!t || !confirm(`Supprimer l'astuce « ${t.title} » ?`)) return;
   state.menageTips = (state.menageTips||[]).filter(x=>x.id!==id);
   (state.menageTasks||[]).forEach(k => { if (k.tipId===id) k.tipId = null; });
-  save(); navigate('#maison/menage/astuces');
+  save(); navigate('#famille/menage/astuces');
 }
 function openTipForm(id) {
   const t = id ? (state.menageTips||[]).find(x=>x.id===id) : null;
@@ -3557,7 +3552,7 @@ function saveTip(id) {
   const idx = id ? state.menageTips.findIndex(x=>x.id===id) : -1;
   if (idx >= 0) state.menageTips[idx] = tip; else state.menageTips.push(tip);
   save(); closeModal();
-  if (id) refreshMaison(); else navigate('#maison/menage/astuces/' + tip.id);
+  if (id) refreshMaison(); else navigate('#famille/menage/astuces/' + tip.id);
 }
 
 // ═══════════════════════════════════════════════════════
