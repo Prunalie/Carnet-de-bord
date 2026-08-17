@@ -527,6 +527,8 @@ function ensureStateFields() {
   if (!state.shoppingHistory) state.shoppingHistory = [];
   if (!state.contacts) state.contacts = [];
   if (!state.customLists) state.customLists = [];
+  if (!state.menageTips) state.menageTips = [];
+  if (!state.menageTasks) state.menageTasks = [];
   if (!state.animaux) state.animaux = {taika:[],oslo:[]};
   if (!state.animaux.taika) state.animaux.taika = [];
   if (!state.animaux.oslo)  state.animaux.oslo  = [];
@@ -589,8 +591,16 @@ function dispatchHash(hash) {
   } else if (section === 'maison') {
     document.body.classList.remove('portal-mode');
     document.body.classList.add('maison-mode');
-    _activeListId = parts[1] || null;
     _editingListItemId = null;
+    if (parts[1] === 'menage') {
+      _maisonView = 'menage';
+      _menageTab  = (parts[2] === 'astuces') ? 'astuces' : 'taches';
+      _menageTipId = parts[3] || null;
+      _activeListId = null;
+    } else {
+      _maisonView = 'listes';
+      _activeListId = parts[1] || null;
+    }
     renderMaisonApp();
 
   } else if (section === 'animaux') {
@@ -741,14 +751,21 @@ const NAV_TABS = [
 function showPortal() { navigate('#'); }
 function enterFamille(tab) { navigate('#famille/' + (tab || 'home')); }
 function showMaison() { navigate('#maison'); }
+let _maisonView = 'listes';
 function renderMaisonApp() {
-  const content = renderListes();
+  const content = _maisonView === 'menage' ? renderMenage() : renderListes();
   document.getElementById('maison-app').innerHTML = `
     <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
       <button onclick="showPortal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
       <h1 style="font-size:1.1rem;font-weight:700;margin:0">🏠 Maison</h1>
     </div>
-    <div style="padding:20px;max-width:800px;margin:0 auto">${content}</div>`;
+    <div style="padding:20px;max-width:800px;margin:0 auto">
+      <div class="seg-tabs">
+        <button class="seg-tab${_maisonView==='listes'?' active':''}" onclick="navigate('#maison')">📋 Listes</button>
+        <button class="seg-tab${_maisonView==='menage'?' active':''}" onclick="navigate('#maison/menage')">🧹 Ménage${_menageLateCount()?` <span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem">${_menageLateCount()}</span>`:''}</button>
+      </div>
+      ${content}
+    </div>`;
 }
 // Les listes sont affichées soit dans l'espace Maison, soit dans un onglet du carnet.
 function refreshMaison() {
@@ -3241,6 +3258,306 @@ function saveListeForm(listId) {
   const id=uid();
   state.customLists.push({id,name,icon,items:[]});
   save(); closeModal(); navigate('#maison/' + id);
+}
+
+// ═══════════════════════════════════════════════════════
+// MÉNAGE — astuces et planning des tâches
+// ═══════════════════════════════════════════════════════
+let _menageTab = 'taches';
+let _menageTipId = null;
+
+const MENAGE_ZONES = [
+  {k:'cuisine',   l:'🍳 Cuisine'},
+  {k:'sdb',       l:'🛁 Salle de bain'},
+  {k:'sols',      l:'🧹 Sols'},
+  {k:'vitres',    l:'🪟 Vitres & miroirs'},
+  {k:'textiles',  l:'🧺 Linge & textiles'},
+  {k:'chambre',   l:'🛏️ Chambres'},
+  {k:'salon',     l:'🛋️ Salon'},
+  {k:'exterieur', l:'🌿 Extérieur'},
+  {k:'autre',     l:'📦 Autre'},
+];
+const zoneLabel = k => (MENAGE_ZONES.find(z=>z.k===k) || MENAGE_ZONES[MENAGE_ZONES.length-1]).l;
+
+const MENAGE_FREQS = [
+  {d:1,l:'Chaque jour'}, {d:2,l:'Tous les 2 jours'}, {d:3,l:'Tous les 3 jours'},
+  {d:7,l:'Chaque semaine'}, {d:14,l:'Toutes les 2 semaines'}, {d:21,l:'Toutes les 3 semaines'},
+  {d:30,l:'Chaque mois'}, {d:60,l:'Tous les 2 mois'}, {d:90,l:'Tous les 3 mois'},
+  {d:180,l:'Tous les 6 mois'}, {d:365,l:'Chaque année'},
+];
+const freqLabel = d => MENAGE_FREQS.find(f=>f.d===Number(d))?.l || `Tous les ${d} jours`;
+
+const _DAY_MS = 86400000;
+function _todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function _todayISO() { const d = _todayMidnight(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// Jours restants avant l'échéance : négatif = en retard, null = jamais faite.
+function taskDueIn(t) {
+  if (!t.lastDone) return null;
+  const last = new Date(t.lastDone + 'T00:00:00');
+  if (isNaN(last)) return null;
+  return Math.round((last.getTime() + Number(t.everyDays||7)*_DAY_MS - _todayMidnight().getTime()) / _DAY_MS);
+}
+function taskSortKey(t) { const d = taskDueIn(t); return d===null ? -1e6 : d; }
+function _menageLateCount() {
+  return (state.menageTasks||[]).filter(t => { const d = taskDueIn(t); return d===null || d<=0; }).length;
+}
+function taskStatus(t) {
+  const d = taskDueIn(t);
+  if (d === null) return {txt:'jamais faite', color:'var(--amber)'};
+  if (d < 0)  return {txt:`en retard de ${-d} jour${-d>1?'s':''}`, color:'#c0392b'};
+  if (d === 0) return {txt:"à faire aujourd'hui", color:'var(--amber)'};
+  if (d === 1) return {txt:'à faire demain', color:'var(--text-muted)'};
+  return {txt:`dans ${d} jours`, color:'var(--text-muted)'};
+}
+
+function renderMenage() {
+  if (_menageTab === 'astuces') return renderMenageAstuces();
+  return renderMenageTaches();
+}
+function _menageSubTabs() {
+  const late = _menageLateCount();
+  return `<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn btn-sm ${_menageTab==='taches'?'btn-primary':'btn-outline'}" onclick="navigate('#maison/menage')">📅 Tâches${late?` (${late})`:''}</button>
+    <button class="btn btn-sm ${_menageTab==='astuces'?'btn-primary':'btn-outline'}" onclick="navigate('#maison/menage/astuces')">💡 Astuces (${(state.menageTips||[]).length})</button>
+  </div>`;
+}
+
+// ── Planning des tâches ────────────────────────────────
+function renderMenageTaches() {
+  const tasks = [...(state.menageTasks||[])].sort((a,b)=>taskSortKey(a)-taskSortKey(b));
+  const now    = tasks.filter(t => { const d=taskDueIn(t); return d===null || d<=0; });
+  const soon   = tasks.filter(t => { const d=taskDueIn(t); return d!==null && d>0 && d<=7; });
+  const later  = tasks.filter(t => { const d=taskDueIn(t); return d!==null && d>7; });
+
+  const row = t => {
+    const st = taskStatus(t);
+    const tip = t.tipId ? (state.menageTips||[]).find(x=>x.id===t.tipId) : null;
+    return `<div class="shop-item" style="align-items:center;gap:8px;flex-wrap:wrap;padding:9px 0">
+      <div style="flex:1;min-width:140px">
+        <div style="font-weight:600;font-size:.93rem">${escHtml(t.name)}</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">${zoneLabel(t.zone)} · ${escHtml(freqLabel(t.everyDays))} · <span style="color:${st.color};font-weight:600">${st.txt}</span></div>
+        ${tip?`<div style="font-size:.74rem;margin-top:2px"><span style="cursor:pointer;color:var(--green-dark);text-decoration:underline" onclick="navigate('#maison/menage/astuces/${tip.id}')">💡 ${escHtml(tip.title)}</span></div>`:''}
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="taskDoneNow('${t.id}')" title="Marquer comme faite aujourd'hui">✅ Fait</button>
+      <button class="btn btn-outline btn-sm" onclick="openTaskForm('${t.id}')" title="Modifier">✏️</button>
+      <button class="del-btn" onclick="deleteTask('${t.id}')" title="Supprimer">🗑</button>
+    </div>`;
+  };
+  const group = (title, list, color) => list.length ? `
+    <div style="margin-bottom:14px">
+      <div style="font-weight:700;font-size:.83rem;color:${color};padding:5px 0;border-bottom:2px solid var(--green-light);margin-bottom:2px">${title} (${list.length})</div>
+      ${list.map(row).join('')}
+    </div>` : '';
+
+  return `${_menageSubTabs()}
+    <div class="section-header" style="margin-bottom:10px">
+      <h2 style="font-size:1.05rem">📅 Tâches ménage</h2>
+      <button class="btn btn-primary btn-sm" onclick="openTaskForm()">+ Nouvelle tâche</button>
+    </div>
+    ${tasks.length===0
+      ? `<div class="empty-state"><div class="icon">📅</div><p>Aucune tâche pour l'instant.</p><p style="margin-top:6px;font-size:.9rem">Ajoutez vos tâches et leur périodicité : l'appli vous dira quand elles sont à refaire.</p></div>`
+      : `<p style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">Appuyez sur <b>✅ Fait</b> quand la tâche est faite : la prochaine échéance est recalculée.</p>
+         <div class="card" style="padding:12px 16px">
+           ${group('🔴 À faire maintenant', now, '#c0392b')}
+           ${group('🗓 Dans la semaine', soon, 'var(--green-dark)')}
+           ${group('⚪ Plus tard', later, 'var(--text-muted)')}
+         </div>`}`;
+}
+function taskDoneNow(id) {
+  const t = (state.menageTasks||[]).find(x=>x.id===id);
+  if (!t) return;
+  t.lastDone = _todayISO();
+  save(); refreshMaison();
+  showToast(`${t.name} · prochaine fois ${freqLabel(t.everyDays).toLowerCase()}`);
+}
+function deleteTask(id) {
+  const t = (state.menageTasks||[]).find(x=>x.id===id);
+  if (!t || !confirm(`Supprimer la tâche « ${t.name} » ?`)) return;
+  state.menageTasks = (state.menageTasks||[]).filter(x=>x.id!==id);
+  save(); refreshMaison();
+}
+function openTaskForm(id) {
+  const t = id ? (state.menageTasks||[]).find(x=>x.id===id) : null;
+  const tips = state.menageTips||[];
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>🧹 ${t?'Modifier la tâche':'Nouvelle tâche'}</h2>
+    <div class="form-group"><label>Quoi faire *</label>
+      <input type="text" id="tk-name" value="${escHtml(t?.name||'')}" placeholder="Ex : Détartrer la douche">
+    </div>
+    <div class="form-group"><label>Où</label>
+      <select id="tk-zone">${MENAGE_ZONES.map(z=>`<option value="${z.k}" ${(t?.zone||'autre')===z.k?'selected':''}>${z.l}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>À refaire</label>
+      <select id="tk-freq" onchange="document.getElementById('tk-custom-wrap').style.display=this.value==='custom'?'block':'none'">
+        ${MENAGE_FREQS.map(f=>`<option value="${f.d}" ${Number(t?.everyDays||7)===f.d?'selected':''}>${f.l}</option>`).join('')}
+        <option value="custom" ${t && !MENAGE_FREQS.some(f=>f.d===Number(t.everyDays))?'selected':''}>Autre…</option>
+      </select>
+      <div id="tk-custom-wrap" style="display:${t && !MENAGE_FREQS.some(f=>f.d===Number(t.everyDays))?'block':'none'};margin-top:8px">
+        <label style="font-size:.8rem;color:var(--text-muted)">Tous les combien de jours ?</label>
+        <input type="number" id="tk-custom" min="1" value="${t?Number(t.everyDays||7):7}" style="width:110px">
+      </div>
+    </div>
+    <div class="form-group"><label>Dernière fois faite</label>
+      <input type="date" id="tk-last" value="${escHtml(t?.lastDone||'')}">
+      <div style="font-size:.76rem;color:var(--text-muted);margin-top:4px">Laissez vide si vous ne savez pas : la tâche sera à faire tout de suite.</div>
+    </div>
+    ${tips.length?`<div class="form-group"><label>Astuce liée</label>
+      <select id="tk-tip">
+        <option value="">— aucune —</option>
+        ${tips.map(x=>`<option value="${x.id}" ${t?.tipId===x.id?'selected':''}>${escHtml(x.title)}</option>`).join('')}
+      </select>
+    </div>`:''}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTask(${t?`'${id}'`:''})">${t?'Enregistrer':'Ajouter'}</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('tk-name')?.focus(),100);
+}
+function saveTask(id) {
+  const name = document.getElementById('tk-name')?.value?.trim();
+  if (!name) { alert('Donnez un nom à la tâche.'); return; }
+  const freqVal = document.getElementById('tk-freq')?.value;
+  let everyDays = freqVal === 'custom'
+    ? Math.max(1, parseInt(document.getElementById('tk-custom')?.value,10) || 7)
+    : Number(freqVal) || 7;
+  const task = {
+    id: id || uid(),
+    name,
+    zone: document.getElementById('tk-zone')?.value || 'autre',
+    everyDays,
+    lastDone: document.getElementById('tk-last')?.value || null,
+    tipId: document.getElementById('tk-tip')?.value || null,
+  };
+  if (!state.menageTasks) state.menageTasks = [];
+  const idx = id ? state.menageTasks.findIndex(t=>t.id===id) : -1;
+  if (idx >= 0) state.menageTasks[idx] = task; else state.menageTasks.push(task);
+  save(); closeModal(); refreshMaison();
+}
+
+// ── Astuces : quel produit pour nettoyer quoi ───────────
+function renderMenageAstuces() {
+  if (_menageTipId) return renderTipDetail(_menageTipId);
+  const tips = state.menageTips||[];
+  const byZone = {};
+  MENAGE_ZONES.forEach(z=>byZone[z.k]=[]);
+  tips.forEach(t => (byZone[t.zone]||byZone['autre']).push(t));
+  MENAGE_ZONES.forEach(z=>byZone[z.k].sort((a,b)=>a.title.localeCompare(b.title,'fr')));
+
+  return `${_menageSubTabs()}
+    <div class="section-header" style="margin-bottom:10px">
+      <h2 style="font-size:1.05rem">💡 Astuces ménage</h2>
+      <button class="btn btn-primary btn-sm" onclick="openTipForm()">+ Nouvelle astuce</button>
+    </div>
+    ${tips.length===0
+      ? `<div class="empty-state"><div class="icon">💡</div><p>Aucune astuce pour l'instant.</p><p style="margin-top:6px;font-size:.9rem">Notez quel produit utiliser pour quoi, comme une fiche recette.</p></div>`
+      : `<input type="search" class="search-box" placeholder="🔍 Rechercher une astuce, un produit…" oninput="filterTips(this.value)" style="width:100%;margin-bottom:14px" autocomplete="off">
+         <div id="tips-list">
+         ${MENAGE_ZONES.map(z => byZone[z.k].length ? `
+           <div class="tip-zone" style="margin-bottom:16px">
+             <div style="font-weight:700;font-size:.8rem;color:var(--text-muted);letter-spacing:.04em;padding:6px 0 5px;border-bottom:1.5px solid var(--border);margin-bottom:8px">${z.l}</div>
+             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+               ${byZone[z.k].map(t=>`
+                 <div class="tip-card" data-search="${escHtml((t.title+' '+(t.products||[]).join(' ')+' '+(t.notes||'')).toLowerCase())}" onclick="navigate('#maison/menage/astuces/${t.id}')" style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:13px 14px;cursor:pointer">
+                   <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">${escHtml(t.title)}</div>
+                   <div style="font-size:.75rem;color:var(--text-muted)">${(t.products||[]).length?escHtml((t.products||[]).slice(0,3).join(' · ')):'—'}</div>
+                 </div>`).join('')}
+             </div>
+           </div>` : '').join('')}
+         </div>`}`;
+}
+function filterTips(v) {
+  const q = (v||'').toLowerCase().trim();
+  document.querySelectorAll('.tip-zone').forEach(zone => {
+    let any = false;
+    zone.querySelectorAll('.tip-card').forEach(card => {
+      const show = !q || card.dataset.search.includes(q);
+      card.style.display = show ? '' : 'none';
+      if (show) any = true;
+    });
+    zone.style.display = any ? '' : 'none';
+  });
+}
+function renderTipDetail(tipId) {
+  const t = (state.menageTips||[]).find(x=>x.id===tipId);
+  if (!t) { _menageTipId = null; return renderMenageAstuces(); }
+  return `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="navigate('#maison/menage/astuces')">← Retour</button>
+      <h2 style="font-size:1.1rem;color:var(--green-dark);margin:0;flex:1">${escHtml(t.title)}</h2>
+      <button class="btn btn-outline btn-sm" onclick="openTipForm('${t.id}')" title="Modifier">✏️</button>
+      <button class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e" onclick="deleteTip('${t.id}')" title="Supprimer">🗑</button>
+    </div>
+    <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:14px">${zoneLabel(t.zone)}</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div style="font-weight:700;color:var(--green-dark);margin-bottom:8px;font-size:.9rem">🧴 Produits</div>
+      ${(t.products||[]).length
+        ? `<ul style="margin:0;padding-left:20px;font-size:.92rem;line-height:1.7">${(t.products||[]).map(p=>`<li>${escHtml(p)}</li>`).join('')}</ul>`
+        : `<div style="font-size:.88rem;color:var(--text-muted)">Aucun produit noté.</div>`}
+    </div>
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div style="font-weight:700;color:var(--green-dark);margin-bottom:8px;font-size:.9rem">📋 Méthode</div>
+      ${(t.steps||[]).length
+        ? `<ol style="margin:0;padding-left:20px;font-size:.92rem;line-height:1.7">${(t.steps||[]).map(s=>`<li style="margin-bottom:4px">${escHtml(s)}</li>`).join('')}</ol>`
+        : `<div style="font-size:.88rem;color:var(--text-muted)">Aucune étape notée.</div>`}
+    </div>
+    ${t.notes?`<div class="card" style="padding:14px 16px;background:var(--green-light)">
+      <div style="font-weight:700;color:var(--green-dark);margin-bottom:6px;font-size:.9rem">📝 Notes</div>
+      <div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap">${escHtml(t.notes)}</div>
+    </div>`:''}`;
+}
+function deleteTip(id) {
+  const t = (state.menageTips||[]).find(x=>x.id===id);
+  if (!t || !confirm(`Supprimer l'astuce « ${t.title} » ?`)) return;
+  state.menageTips = (state.menageTips||[]).filter(x=>x.id!==id);
+  (state.menageTasks||[]).forEach(k => { if (k.tipId===id) k.tipId = null; });
+  save(); navigate('#maison/menage/astuces');
+}
+function openTipForm(id) {
+  const t = id ? (state.menageTips||[]).find(x=>x.id===id) : null;
+  document.getElementById('modal-content').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>💡 ${t?'Modifier l\'astuce':'Nouvelle astuce'}</h2>
+    <div class="form-group"><label>Titre *</label>
+      <input type="text" id="tp-title" value="${escHtml(t?.title||'')}" placeholder="Ex : Détartrer la bouilloire">
+    </div>
+    <div class="form-group"><label>Où / quoi nettoyer</label>
+      <select id="tp-zone">${MENAGE_ZONES.map(z=>`<option value="${z.k}" ${(t?.zone||'autre')===z.k?'selected':''}>${z.l}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Produits — un par ligne</label>
+      <textarea id="tp-products" placeholder="Vinaigre blanc&#10;Bicarbonate de soude" style="min-height:80px">${escHtml((t?.products||[]).join('\n'))}</textarea>
+    </div>
+    <div class="form-group"><label>Méthode — une étape par ligne</label>
+      <textarea id="tp-steps" placeholder="Remplir à moitié de vinaigre blanc&#10;Faire bouillir puis laisser agir 30 min&#10;Rincer abondamment" style="min-height:110px">${escHtml((t?.steps||[]).join('\n'))}</textarea>
+    </div>
+    <div class="form-group"><label>Notes</label>
+      <textarea id="tp-notes" placeholder="Précautions, dosages, à ne pas mélanger avec…" style="min-height:70px">${escHtml(t?.notes||'')}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTip(${t?`'${id}'`:''})">${t?'Enregistrer':'Ajouter'}</button>
+    </div>`;
+  openModal();
+  setTimeout(()=>document.getElementById('tp-title')?.focus(),100);
+}
+function saveTip(id) {
+  const title = document.getElementById('tp-title')?.value?.trim();
+  if (!title) { alert('Donnez un titre à l\'astuce.'); return; }
+  const lines = el => (document.getElementById(el)?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const tip = {
+    id: id || uid(),
+    title,
+    zone: document.getElementById('tp-zone')?.value || 'autre',
+    products: lines('tp-products'),
+    steps: lines('tp-steps'),
+    notes: document.getElementById('tp-notes')?.value?.trim() || '',
+  };
+  if (!state.menageTips) state.menageTips = [];
+  const idx = id ? state.menageTips.findIndex(x=>x.id===id) : -1;
+  if (idx >= 0) state.menageTips[idx] = tip; else state.menageTips.push(tip);
+  save(); closeModal();
+  if (id) refreshMaison(); else navigate('#maison/menage/astuces/' + tip.id);
 }
 
 // ═══════════════════════════════════════════════════════
