@@ -181,6 +181,16 @@ body.maison-mode #maison-app{display:block}
 .mg-choice-btn{display:block;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;margin-bottom:10px;cursor:pointer;font-size:.92rem;font-weight:600;color:var(--text);font-family:inherit;transition:.15s}
 .mg-choice-btn:hover{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
 .mg-conseq{background:var(--green-light);border:1px solid var(--green);border-radius:var(--radius);padding:16px;margin-bottom:16px;white-space:pre-wrap;line-height:1.5}
+/* ── Margot — accueil, histoires, idees ── */
+.mg-home-card{display:flex;align-items:flex-start;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;cursor:pointer;transition:.2s}
+.mg-home-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
+.mg-home-icon{font-size:2rem;line-height:1;flex-shrink:0}
+.mg-texte{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:1rem;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.mg-idee{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:7px;font-size:.92rem}
+.mg-idee.fait{opacity:.55}
+.mg-idee.fait .mg-idee-txt{text-decoration:line-through}
+.mg-idee-check{background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--green);flex-shrink:0;padding:0 2px;line-height:1}
+.mg-idee-txt{flex:1;cursor:pointer;word-break:break-word}
 /* ── Margot — conseils d'ecriture ── */
 .mg-guide-cta{display:flex;align-items:center;gap:12px;background:var(--amber-light);border:1.5px solid var(--amber);border-radius:var(--radius);padding:13px 16px;margin-bottom:14px;cursor:pointer;font-size:.9rem;transition:.15s}
 .mg-guide-cta:hover{background:#fbedd3}
@@ -569,8 +579,10 @@ function ensureStateFields() {
   if (!state.animaux) state.animaux = {taika:[],oslo:[]};
   if (!state.animaux.taika) state.animaux.taika = [];
   if (!state.animaux.oslo)  state.animaux.oslo  = [];
-  if (!state.margot) state.margot = {jeux:[]};
+  if (!state.margot) state.margot = {};
   if (!state.margot.jeux) state.margot.jeux = [];
+  if (!state.margot.histoires) state.margot.histoires = [];
+  if (!state.margot.idees) state.margot.idees = [];
   state.margot.jeux.forEach(j => {
     if (!j.scenes) j.scenes = [];
     if (!j.jauges) j.jauges = [];
@@ -663,9 +675,10 @@ function dispatchHash(hash) {
     document.body.classList.remove('maison-mode');
     document.body.classList.add('portal-mode');
     _margotTab     = parts[1] || 'home';
-    _margotJeuId   = parts[2] || null;
+    _margotId      = parts[2] || null;
     _margotView    = parts[3] || null;
     _margotSceneId = parts[4] || null;
+    if (_margotTab === 'aide') _aideTab = parts[2] || 'bases';
     renderMargotSpace();
   }
 }
@@ -926,46 +939,45 @@ function checkPin() {
 }
 
 // ═══════════════════════════════════════════════════════
-// ESPACE MARGOT — Jeux de décision
+// ESPACE MARGOT
 // ═══════════════════════════════════════════════════════
 let _margotTab     = 'home';
-let _margotJeuId   = null;
-let _margotView    = null;   // null | 'modifier' | 'scene' | 'jouer'
+let _margotId      = null;
+let _margotView    = null;
 let _margotSceneId = null;
 
 const MG_TABS = [
-  {id:'home',  icon:'🏠', label:'Accueil'},
-  {id:'jeux',  icon:'🎮', label:'Mes jeux'},
-  {id:'guide', icon:'💡', label:'Conseils'},
+  {id:'home',      icon:'🏠', label:'Accueil'},
+  {id:'jeux',      icon:'🎮', label:'Jeux'},
+  {id:'histoires', icon:'✍️', label:'Histoires'},
+  {id:'idees',     icon:'💡', label:'Idées'},
+  {id:'aide',      icon:'📚', label:'Aide'},
+];
+
+const MG_SECTIONS = [
+  {id:'jeux',      icon:'🎮', titre:'Mes jeux de décision',
+   desc:"Des histoires dont on est le personnage, où chaque rencontre demande une décision."},
+  {id:'histoires', icon:'✍️', titre:'Mes histoires',
+   desc:"Écrire des textes, des nouvelles, des débuts de romans — au calme."},
+  {id:'idees',     icon:'💡', titre:'Mes idées',
+   desc:"Tout noter avant d'oublier : une phrase, un personnage, une situation."},
+  {id:'aide',      icon:'📚', titre:"Aide à l'écriture",
+   desc:"Par où commencer, comment débloquer, les conseils qui servent vraiment."},
 ];
 
 function setMargotTab(id) { navigate('#margot/' + id); }
-
-function mgJeux() {
-  if (!state.margot) state.margot = {jeux:[]};
-  if (!state.margot.jeux) state.margot.jeux = [];
-  return state.margot.jeux;
-}
-function mgJeu(id)          { return mgJeux().find(j => j.id === id) || null; }
-function mgScenes(jeu)      { return (jeu && jeu.scenes) || []; }
-function mgScene(jeu, id)   { return mgScenes(jeu).find(s => s.id === id) || null; }
-function mgJauges(jeu)      { return (jeu && jeu.jauges) || []; }
-function mgSceneDepart(jeu) {
-  if (jeu.sceneDepart && mgScene(jeu, jeu.sceneDepart)) return jeu.sceneDepart;
-  return mgScenes(jeu)[0] ? mgScenes(jeu)[0].id : null;
-}
 
 function renderMargotSpace() {
   let content = '', title = 'Espace Margot', back = '#', showNav = true;
 
   if (_margotTab === 'jeux') {
-    const jeu = (_margotJeuId && _margotJeuId !== 'nouveau') ? mgJeu(_margotJeuId) : null;
+    const jeu = (_margotId && _margotId !== 'nouveau') ? mgJeu(_margotId) : null;
 
-    if (_margotJeuId === 'nouveau') {
+    if (_margotId === 'nouveau') {
       title = 'Nouveau jeu'; back = '#margot/jeux'; showNav = false;
       content = renderJeuForm(null);
 
-    } else if (_margotJeuId && !jeu) {
+    } else if (_margotId && !jeu) {
       title = 'Mes jeux'; back = '#margot/jeux';
       content = `<div class="empty-state"><div class="icon">🤔</div><p>Ce jeu n'existe plus.</p>
         <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/jeux')">Retour aux jeux</button></div>`;
@@ -988,12 +1000,42 @@ function renderMargotSpace() {
       content = renderJeuDetail(jeu.id);
 
     } else {
-      title = 'Mes jeux'; back = '#';
+      title = 'Mes jeux'; back = '#margot';
       content = renderJeuxListe();
     }
-  } else if (_margotTab === 'guide') {
-    title = 'Conseils d\'écriture';
-    content = renderMargotGuide();
+
+  } else if (_margotTab === 'histoires') {
+    const h = (_margotId && _margotId !== 'nouvelle') ? mgHistoire(_margotId) : null;
+
+    if (_margotId === 'nouvelle') {
+      title = 'Nouveau texte'; back = '#margot/histoires'; showNav = false;
+      content = renderHistoireForm(null);
+
+    } else if (_margotId && !h) {
+      title = 'Mes histoires'; back = '#margot/histoires';
+      content = `<div class="empty-state"><div class="icon">🤔</div><p>Ce texte n'existe plus.</p>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/histoires')">Retour aux histoires</button></div>`;
+
+    } else if (h && _margotView === 'modifier') {
+      title = 'Écrire'; back = '#margot/histoires/' + h.id; showNav = false;
+      content = renderHistoireForm(h.id);
+
+    } else if (h) {
+      title = h.titre || 'Texte'; back = '#margot/histoires'; showNav = false;
+      content = renderHistoireLecture(h.id);
+
+    } else {
+      title = 'Mes histoires'; back = '#margot';
+      content = renderHistoiresListe();
+    }
+
+  } else if (_margotTab === 'idees') {
+    title = 'Mes idées'; back = '#margot';
+    content = renderIdees();
+
+  } else if (_margotTab === 'aide') {
+    title = "Aide à l'écriture"; back = '#margot';
+    content = renderMargotAide();
 
   } else {
     content = renderMargotHome();
@@ -1014,31 +1056,67 @@ function renderMargotSpace() {
     ${nav}`;
 }
 
+// ── Accueil de l'espace ──
+function mgSectionStat(id) {
+  if (id === 'jeux') {
+    const n = mgJeux().length;
+    const sc = mgJeux().reduce((s,j)=>s+mgScenes(j).length,0);
+    return n ? `${n} jeu${n>1?'x':''} · ${sc} rencontre${sc>1?'s':''}` : 'Rien pour le moment';
+  }
+  if (id === 'histoires') {
+    const n = mgHistoires().length;
+    const mots = mgHistoires().reduce((s,h)=>s+mgNbMots(h.contenu),0);
+    return n ? `${n} texte${n>1?'s':''} · ${mots} mot${mots>1?'s':''}` : 'Rien pour le moment';
+  }
+  if (id === 'idees') {
+    const n = mgIdees().length;
+    const reste = mgIdees().filter(i=>!i.fait).length;
+    return n ? `${n} idée${n>1?'s':''} · ${reste} à explorer` : 'Rien pour le moment';
+  }
+  return '4 rubriques · jeux et histoires';
+}
+
 function renderMargotHome() {
-  const nb = mgJeux().length;
-  const nbScenes = mgJeux().reduce((s,j)=>s+mgScenes(j).length,0);
-  return `
-    <div style="text-align:center;padding:16px 0 24px">
-      <div style="font-size:3.4rem">👩</div>
-      <h2 style="font-size:1.3rem;margin:8px 0 4px">Bonjour Margot !</h2>
-      <p class="mg-muted">Ton espace personnel</p>
-    </div>
-    <div class="mg-card clickable" onclick="navigate('#margot/jeux')">
-      <div style="display:flex;align-items:center;gap:14px">
-        <div style="font-size:2.2rem">🎮</div>
-        <div style="flex:1">
-          <div class="mg-card-title">Mes jeux de décision</div>
-          <div class="mg-muted">${nb} jeu${nb>1?'x':''} · ${nbScenes} rencontre${nbScenes>1?'s':''}</div>
-        </div>
-        <div style="color:var(--text-muted);font-size:1.2rem">›</div>
+  const cards = MG_SECTIONS.map(s => `
+    <div class="mg-home-card" onclick="navigate('#margot/${s.id}')">
+      <div class="mg-home-icon">${s.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="mg-card-title">${s.titre}</div>
+        <div class="mg-muted" style="margin-top:2px">${s.desc}</div>
+        <div class="mg-badge" style="margin-top:8px">${mgSectionStat(s.id)}</div>
       </div>
+      <div style="color:var(--text-muted);font-size:1.2rem;flex-shrink:0">›</div>
+    </div>`).join('');
+
+  return `
+    <div style="text-align:center;padding:10px 0 22px">
+      <div style="font-size:3.2rem">👩</div>
+      <h2 style="font-size:1.3rem;margin:8px 0 4px">Bonjour Margot !</h2>
+      <p class="mg-muted">Ton espace pour écrire</p>
     </div>
-    <div class="mg-guide-cta" onclick="navigate('#margot/guide')">
-      <span style="font-size:1.3rem">💡</span>
-      <span style="flex:1"><strong>Comment écrire mon histoire</strong><br><span class="mg-muted">Par où commencer, en 5 étapes</span></span>
-      <span style="color:var(--text-muted)">›</span>
-    </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer un nouveau jeu</button>`;
+    ${cards}
+    <div class="flex-gap" style="margin-top:16px">
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Jeu</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/histoires/nouvelle')">＋ Texte</button>
+      <button class="btn btn-outline btn-sm" onclick="navigate('#margot/idees')">＋ Idée</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// MARGOT — MES JEUX DE DÉCISION
+// ═══════════════════════════════════════════════════════
+function mgJeux() {
+  if (!state.margot) state.margot = {};
+  if (!state.margot.jeux) state.margot.jeux = [];
+  return state.margot.jeux;
+}
+function mgJeu(id)          { return mgJeux().find(j => j.id === id) || null; }
+function mgScenes(jeu)      { return (jeu && jeu.scenes) || []; }
+function mgScene(jeu, id)   { return mgScenes(jeu).find(s => s.id === id) || null; }
+function mgJauges(jeu)      { return (jeu && jeu.jauges) || []; }
+function mgSceneDepart(jeu) {
+  if (jeu.sceneDepart && mgScene(jeu, jeu.sceneDepart)) return jeu.sceneDepart;
+  return mgScenes(jeu)[0] ? mgScenes(jeu)[0].id : null;
 }
 
 // ── Liste des jeux ──
@@ -1069,9 +1147,9 @@ function renderJeuxListe() {
       <h2 style="font-size:1.15rem;color:var(--green-dark)">🎮 Mes jeux de décision</h2>
       <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Nouveau jeu</button>
     </div>
-    <div class="mg-guide-cta" onclick="navigate('#margot/guide')">
-      <span style="font-size:1.3rem">💡</span>
-      <span style="flex:1"><strong>Comment écrire mon histoire</strong><br><span class="mg-muted">Par où commencer, en 5 étapes</span></span>
+    <div class="mg-guide-cta" onclick="navigate('#margot/aide/jeux')">
+      <span style="font-size:1.3rem">📚</span>
+      <span style="flex:1"><strong>Écrire un jeu de décision</strong><br><span class="mg-muted">Les conseils : tension, jauges, choix qui coûtent</span></span>
       <span style="color:var(--text-muted)">›</span>
     </div>
     ${list.length ? cards : `
@@ -1460,76 +1538,6 @@ function saveScene(jeuId, sceneId) {
   navigate('#margot/jeux/' + jeuId);
 }
 
-// ── Conseils d'écriture ──
-function mgGuideSection(num, titre, corps, open) {
-  return `<details class="mg-guide"${open ? ' open' : ''}>
-    <summary><span class="mg-guide-num">${num}</span>${titre}</summary>
-    <div class="mg-guide-body">${corps}</div>
-  </details>`;
-}
-
-function renderMargotGuide() {
-  return `
-    <div class="mg-card" style="background:var(--green-dark);color:#fff;border:none">
-      <div style="font-size:1.6rem;margin-bottom:6px">💡</div>
-      <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">Comment écrire mon histoire</div>
-      <p style="font-size:.88rem;line-height:1.5;opacity:.9">Dans un jeu de décision, ce n'est pas l'histoire qui compte le plus — c'est la <strong>tension</strong>. La vue d'ensemble dont tu as besoin tient en quatre lignes, pas en un plan détaillé.</p>
-    </div>
-
-    ${mgGuideSection(1, 'Commence par une tension', `
-      <p>Un sujet (« une journée à Paris ») ne produit pas de bons choix. Une tension, si. C'est deux choses désirables qui ne peuvent pas coexister :</p>
-      <ul>
-        <li>aider les autres <strong>contre</strong> se préserver</li>
-        <li>dire la vérité <strong>contre</strong> garder quelqu'un</li>
-        <li>partir <strong>contre</strong> appartenir quelque part</li>
-        <li>être aimée <strong>contre</strong> être honnête</li>
-      </ul>
-      <p>Écris <strong>une seule phrase</strong> :</p>
-      <div class="mg-guide-ex">« Mon jeu demande au joueur : jusqu'où on aide quelqu'un avant de se perdre soi-même ? »</div>
-      <p>Cette phrase, c'est ta boussole. Chaque fois que tu hésiteras sur un choix à écrire, tu reviendras à elle. Elle a sa place dans le <strong>pitch</strong> de ton jeu.</p>
-      <div class="mg-guide-key">Ce que tu veux « faire ressortir » est déjà là : c'est le côté de la tension qui fait mal.</div>`, true)}
-
-    ${mgGuideSection(2, 'Tes jauges = ta tension visible', `
-      <p>C'est l'astuce la plus utile. Prends les deux forces de ta tension et fais-en tes deux jauges :</p>
-      <div class="mg-guide-pair"><span style="flex:1">aider ↔ se préserver</span><span style="flex:1;font-weight:600">❤️ Lien · 🔋 Énergie</span></div>
-      <div class="mg-guide-pair"><span style="flex:1">vérité ↔ garder les gens</span><span style="flex:1;font-weight:600">🪞 Sincérité · 🤝 Relations</span></div>
-      <div class="mg-guide-pair"><span style="flex:1">partir ↔ appartenir</span><span style="flex:1;font-weight:600">🧭 Liberté · 🏠 Racines</span></div>
-      <p style="margin-top:12px">À partir de là, ton jeu s'écrit presque tout seul :</p>
-      <div class="mg-guide-key">Un bon choix fait <strong>monter une jauge et descendre l'autre</strong>. Si un choix ne coûte rien, ce n'est pas un choix — c'est une récompense.</div>
-      <p class="mg-muted">À savoir : pour l'instant les jauges s'affichent et bougent pendant la partie, mais elles ne changent pas la fin automatiquement. Les fins dépendent uniquement du chemin de choix.</p>`)}
-
-    ${mgGuideSection(3, 'Donne un défaut à ton personnage', `
-      <p>« Lou, 25 ans, curieuse et gentille » ne crée aucune histoire.</p>
-      <div class="mg-guide-ex">« Lou n'arrive pas à dire non. »</div>
-      <p>Celui-là en crée une immédiatement : chaque rencontre devient une occasion de tester ce défaut. Écris-le dans la case <strong>« Qui est-il / elle ? »</strong> de ton personnage principal.</p>`)}
-
-    ${mgGuideSection(4, 'Vise petit pour la première version', `
-      <p>Ne construis pas un arbre géant : il explose en branches et tu abandonnes. La forme qui marche :</p>
-      <div class="mg-guide-tree">     Rencontre 1  (la mise en place)
-           ↓
-     Rencontre 2  (ça se complique)
-        ↙     ↘
-   Fin A       Fin B</div>
-      <p><strong>5 rencontres, 2 ou 3 fins.</strong> Tu ajoutes des branches ensuite, une fois que tu sais que ça tient.</p>
-      <div class="mg-guide-key">Pour éviter l'explosion : fais <strong>converger</strong> tes chemins. Deux choix différents peuvent mener à la même rencontre suivante — ce sont les jauges qui gardent la mémoire de ce qui a été choisi.</div>`)}
-
-    ${mgGuideSection(5, 'Écris les choix avant la scène', `
-      <p>Contre-intuitif, mais très efficace. Note d'abord les 2 ou 3 décisions possibles, <strong>puis</strong> écris la situation qui rend ces décisions difficiles. La scène n'existe que pour ça.</p>
-      <div class="mg-guide-key">Un bon test : si l'un des choix est évidemment le « bon », supprime-le ou rends-le coûteux.</div>`)}
-
-    ${mgGuideSection('✓', 'Le pense-bête', `
-      <ul>
-        <li>Ma tension tient en une phrase.</li>
-        <li>Mes deux jauges sont les deux côtés de cette tension.</li>
-        <li>Mon personnage a un défaut, pas des qualités.</li>
-        <li>Chaque choix coûte quelque chose.</li>
-        <li>Aucun choix n'est évidemment le bon.</li>
-        <li>5 rencontres, 2 ou 3 fins — pas plus pour commencer.</li>
-      </ul>`)}
-
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer un jeu</button>`;
-}
-
 // ── Mode test : jouer la partie ──
 let _play = {jeuId:null, sceneId:null, jauges:{}, consequence:null, suivantId:null, nbChoix:0};
 
@@ -1615,6 +1623,484 @@ function mgRejouer(jeuId) {
   if (!jeu) return;
   mgResetPlay(jeu);
   renderMargotSpace();
+}
+
+// ═══════════════════════════════════════════════════════
+// MARGOT — MES HISTOIRES
+// ═══════════════════════════════════════════════════════
+function mgHistoires() {
+  if (!state.margot) state.margot = {};
+  if (!state.margot.histoires) state.margot.histoires = [];
+  return state.margot.histoires;
+}
+function mgHistoire(id) { return mgHistoires().find(h => h.id === id) || null; }
+function mgNbMots(t) { return (t || '').trim() ? t.trim().split(/\s+/).length : 0; }
+function mgDateCourte(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+}
+
+function renderHistoiresListe() {
+  const list = mgHistoires().slice().sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+  const cards = list.map(h => {
+    const mots = mgNbMots(h.contenu);
+    const extrait = (h.contenu || '').trim().replace(/\s+/g,' ').slice(0,110);
+    return `
+    <div class="mg-card clickable" onclick="navigate('#margot/histoires/${h.id}')">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:1.8rem;line-height:1">${h.emoji || '📄'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mg-card-title">${escHtml(h.titre)}</div>
+          ${h.resume ? `<div class="mg-muted" style="margin-top:2px">${escHtml(h.resume)}</div>` : ''}
+          ${extrait ? `<div class="mg-muted" style="margin-top:6px;font-style:italic">${escHtml(extrait)}${(h.contenu||'').length>110?'…':''}</div>` : ''}
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+            <span class="mg-badge">${mots} mot${mots>1?'s':''}</span>
+            ${h.updatedAt ? `<span class="mg-badge amber">Modifié le ${mgDateCourte(h.updatedAt)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section-header" style="margin-bottom:14px">
+      <h2 style="font-size:1.15rem;color:var(--green-dark)">✍️ Mes histoires</h2>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/histoires/nouvelle')">＋ Nouveau texte</button>
+    </div>
+    ${list.length ? cards : `
+      <div class="empty-state">
+        <div class="icon">✍️</div>
+        <p>Aucun texte pour l'instant.</p>
+        <p style="font-size:.85rem;margin-top:6px">Une nouvelle, un début de roman, une scène qui te trotte dans la tête — commence n'importe où, tu trieras après.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/histoires/nouvelle')">＋ Écrire mon premier texte</button>
+        <button class="btn btn-outline" style="margin-top:8px" onclick="navigate('#margot/aide/histoires')">📚 Lire les conseils d'abord</button>
+      </div>`}`;
+}
+
+function renderHistoireForm(id) {
+  const h = id ? mgHistoire(id) : null;
+  return `
+    <div class="mg-card">
+      <div class="two-col">
+        <div class="form-group">
+          <label>Titre *</label>
+          <input type="text" id="ht-titre" placeholder="Ex : La porte bleue" value="${escHtml(h?h.titre:'')}">
+        </div>
+        <div class="form-group">
+          <label>Emoji</label>
+          <input type="text" id="ht-emoji" maxlength="4" placeholder="📄" value="${escHtml(h?(h.emoji||''):'')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>En une ligne (optionnel)</label>
+        <input type="text" id="ht-resume" placeholder="Ex : Une femme retrouve la maison de son enfance" value="${escHtml(h?(h.resume||''):'')}">
+      </div>
+      <div class="form-group">
+        <label>Ton texte</label>
+        <textarea id="ht-contenu" placeholder="Écris ici. Personne ne lit par-dessus ton épaule." style="min-height:340px;line-height:1.6" oninput="mgMajCompteur()">${escHtml(h?(h.contenu||''):'')}</textarea>
+        <div class="mg-muted" id="ht-compteur" style="text-align:right;margin-top:4px"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="navigate('${h ? '#margot/histoires/'+h.id : '#margot/histoires'}')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveHistoire(${h ? `'${h.id}'` : ''})">Enregistrer</button>
+      </div>
+    </div>`;
+}
+
+function mgMajCompteur() {
+  const el = document.getElementById('ht-compteur');
+  const ta = document.getElementById('ht-contenu');
+  if (!el || !ta) return;
+  const n = mgNbMots(ta.value);
+  el.textContent = n + ' mot' + (n>1?'s':'');
+}
+
+function saveHistoire(id) {
+  const g = el => (document.getElementById(el)?.value || '').trim();
+  const titre = g('ht-titre');
+  if (!titre) { alert('Donne un titre à ton texte.'); document.getElementById('ht-titre')?.focus(); return; }
+  const existant = id ? mgHistoire(id) : null;
+  const h = {
+    id: id || uid(),
+    titre,
+    emoji: g('ht-emoji') || '📄',
+    resume: g('ht-resume'),
+    contenu: document.getElementById('ht-contenu')?.value || '',
+    createdAt: existant ? existant.createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const list = mgHistoires();
+  const idx = id ? list.findIndex(x => x.id === id) : -1;
+  if (idx >= 0) list[idx] = h; else list.push(h);
+  save();
+  showToast('✅ Texte enregistré');
+  navigate('#margot/histoires/' + h.id);
+}
+
+function deleteHistoire(id) {
+  const h = mgHistoire(id);
+  if (!h) return;
+  if (!confirm(`Supprimer définitivement « ${h.titre} » ?`)) return;
+  state.margot.histoires = mgHistoires().filter(x => x.id !== id);
+  save();
+  navigate('#margot/histoires');
+}
+
+function renderHistoireLecture(id) {
+  const h = mgHistoire(id);
+  const mots = mgNbMots(h.contenu);
+  const minutes = Math.max(1, Math.round(mots / 200));
+  return `
+    <div class="mg-card">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:2.2rem;line-height:1">${h.emoji || '📄'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mg-card-title" style="font-size:1.15rem">${escHtml(h.titre)}</div>
+          ${h.resume ? `<div class="mg-muted" style="margin-top:2px">${escHtml(h.resume)}</div>` : ''}
+          <div class="mg-muted" style="margin-top:6px">${mots} mot${mots>1?'s':''} · ${minutes} min de lecture${h.updatedAt?' · modifié le '+mgDateCourte(h.updatedAt):''}</div>
+        </div>
+      </div>
+      <div class="flex-gap" style="margin-top:14px">
+        <button class="btn btn-primary btn-sm" onclick="navigate('#margot/histoires/${h.id}/modifier')">✏️ Écrire</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteHistoire('${h.id}')">🗑️ Supprimer</button>
+      </div>
+    </div>
+    ${h.contenu ? `<div class="mg-texte">${escHtml(h.contenu)}</div>` : `
+      <div class="empty-state">
+        <div class="icon">📄</div>
+        <p>Ce texte est encore vide.</p>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/histoires/${h.id}/modifier')">✏️ Commencer à écrire</button>
+      </div>`}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// MARGOT — MES IDÉES
+// ═══════════════════════════════════════════════════════
+const MG_IDEE_TYPES = [
+  {id:'jeu',      icon:'🎮', label:'Jeu'},
+  {id:'histoire', icon:'✍️', label:'Histoire'},
+  {id:'autre',    icon:'💭', label:'Autre'},
+];
+let _ideeFiltre = 'toutes';
+
+function mgIdees() {
+  if (!state.margot) state.margot = {};
+  if (!state.margot.idees) state.margot.idees = [];
+  return state.margot.idees;
+}
+function mgIdeeType(id) { return MG_IDEE_TYPES.find(t => t.id === id) || MG_IDEE_TYPES[2]; }
+
+function renderIdees() {
+  const filtres = [{id:'toutes', icon:'✨', label:'Toutes'}].concat(MG_IDEE_TYPES);
+  return `
+    <div class="mg-card" style="padding:14px">
+      <label>Une idée qui passe — note-la tout de suite</label>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input type="text" id="idee-texte" placeholder="Ex : quelqu'un qui reçoit une lettre de lui-même" onkeydown="if(event.key==='Enter')addIdee()" style="flex:1">
+        <button class="btn btn-primary" onclick="addIdee()" style="padding:9px 14px">＋</button>
+      </div>
+      <div class="check-grid" style="margin-top:10px">
+        ${MG_IDEE_TYPES.map((t,i) => `
+          <label class="check-label">
+            <input type="radio" name="idee-type" value="${t.id}" ${i===2?'checked':''}>${t.icon} ${t.label}
+          </label>`).join('')}
+      </div>
+    </div>
+
+    <div class="filters" style="margin-bottom:12px">
+      ${filtres.map(f => `<button class="filter-btn${f.id===_ideeFiltre?' on':''}" onclick="setIdeeFiltre('${f.id}')">${f.icon} ${f.label}</button>`).join('')}
+    </div>
+
+    <div id="idees-list">${renderIdeesListe()}</div>`;
+}
+
+function renderIdeesListe() {
+  let list = mgIdees().slice().reverse();
+  if (_ideeFiltre !== 'toutes') list = list.filter(i => (i.type||'autre') === _ideeFiltre);
+  const aFaire = list.filter(i => !i.fait);
+  const faites  = list.filter(i => i.fait);
+
+  const ligne = i => {
+    const t = mgIdeeType(i.type);
+    return `
+    <div class="mg-idee${i.fait?' fait':''}">
+      <button class="mg-idee-check" onclick="toggleIdee('${i.id}')" title="${i.fait?'Remettre dans les idées à explorer':'Marquer comme utilisée'}">${i.fait?'✓':'○'}</button>
+      <span class="mg-idee-txt" onclick="toggleIdee('${i.id}')">${escHtml(i.texte)}</span>
+      <span class="mg-badge" style="flex-shrink:0">${t.icon}</span>
+      <button class="li-btn" onclick="deleteIdee('${i.id}')" title="Supprimer">🗑️</button>
+    </div>`;
+  };
+
+  if (!list.length) return `
+    <div class="empty-state">
+      <div class="icon">💡</div>
+      <p>${_ideeFiltre==='toutes' ? 'Aucune idée notée.' : 'Aucune idée dans cette catégorie.'}</p>
+      <p style="font-size:.85rem;margin-top:6px">Les idées ne préviennent pas. Note-les en une ligne, même bancales — tu trieras plus tard.</p>
+    </div>`;
+
+  return `
+    ${aFaire.map(ligne).join('')}
+    ${faites.length ? `<div class="mg-muted" style="margin:16px 0 8px;font-weight:700">Déjà utilisées (${faites.length})</div>${faites.map(ligne).join('')}` : ''}`;
+}
+
+function setIdeeFiltre(f) { _ideeFiltre = f; renderMargotSpace(); }
+
+function addIdee() {
+  const input = document.getElementById('idee-texte');
+  const texte = (input?.value || '').trim();
+  if (!texte) { input?.focus(); return; }
+  const type = document.querySelector('input[name="idee-type"]:checked')?.value || 'autre';
+  mgIdees().push({id:uid(), texte, type, fait:false, createdAt:new Date().toISOString()});
+  save();
+  input.value = '';
+  document.getElementById('idees-list').innerHTML = renderIdeesListe();
+  input.focus();
+  showToast('💡 Idée notée');
+}
+
+function toggleIdee(id) {
+  const i = mgIdees().find(x => x.id === id);
+  if (!i) return;
+  i.fait = !i.fait;
+  save();
+  document.getElementById('idees-list').innerHTML = renderIdeesListe();
+}
+
+function deleteIdee(id) {
+  state.margot.idees = mgIdees().filter(x => x.id !== id);
+  save();
+  document.getElementById('idees-list').innerHTML = renderIdeesListe();
+}
+
+// ═══════════════════════════════════════════════════════
+// MARGOT — AIDE À L'ÉCRITURE
+// ═══════════════════════════════════════════════════════
+let _aideTab = 'bases';
+
+const MG_AIDE_TABS = [
+  {id:'bases',     label:'Les bases'},
+  {id:'jeux',      label:'Jeux'},
+  {id:'histoires', label:'Histoires'},
+  {id:'debloquer', label:'Blocage'},
+];
+
+function mgFiche(num, titre, corps, open) {
+  return `<details class="mg-guide"${open ? ' open' : ''}>
+    <summary><span class="mg-guide-num">${num}</span>${titre}</summary>
+    <div class="mg-guide-body">${corps}</div>
+  </details>`;
+}
+
+function mgAideIntro(emoji, titre, texte) {
+  return `<div class="mg-card" style="background:var(--green-dark);color:#fff;border:none">
+    <div style="font-size:1.6rem;margin-bottom:6px">${emoji}</div>
+    <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">${titre}</div>
+    <p style="font-size:.88rem;line-height:1.5;opacity:.9">${texte}</p>
+  </div>`;
+}
+
+function renderMargotAide() {
+  const segs = MG_AIDE_TABS.map(t =>
+    `<button class="seg-tab${t.id===_aideTab?' active':''}" onclick="navigate('#margot/aide/${t.id}')">${t.label}</button>`).join('');
+  let corps = '';
+  if (_aideTab === 'jeux')            corps = mgAideJeux();
+  else if (_aideTab === 'histoires')  corps = mgAideHistoires();
+  else if (_aideTab === 'debloquer')  corps = mgAideDebloquer();
+  else                                corps = mgAideBases();
+  return `<div class="seg-tabs">${segs}</div>${corps}`;
+}
+
+// ── Onglet : les bases ──
+function mgAideBases() {
+  return mgAideIntro('📚', "Ce qui marche, jeu ou histoire",
+    "Ces cinq fiches valent pour tout ce que tu écris. Le reste — jauges, chapitres, dialogues — n'est que de la mécanique par-dessus.") +
+
+  mgFiche(1, "Pars d'une tension, pas d'un sujet", `
+    <p>Un sujet (« une journée à Paris », « une histoire d'amitié ») ne produit rien. Une tension, si. C'est deux choses désirables qui ne peuvent pas coexister :</p>
+    <ul>
+      <li>aider les autres <strong>contre</strong> se préserver</li>
+      <li>dire la vérité <strong>contre</strong> garder quelqu'un</li>
+      <li>partir <strong>contre</strong> appartenir quelque part</li>
+      <li>être aimée <strong>contre</strong> être honnête</li>
+    </ul>
+    <p>Écris <strong>une seule phrase</strong> :</p>
+    <div class="mg-guide-ex">« Mon histoire demande : jusqu'où on aide quelqu'un avant de se perdre soi-même ? »</div>
+    <p>Cette phrase, c'est ta boussole. Chaque fois que tu hésiteras — sur un choix, sur une scène, sur une fin — tu reviendras à elle.</p>
+    <div class="mg-guide-key">Test : si ta phrase a une réponse évidente, ce n'est pas encore une tension.</div>`, true) +
+
+  mgFiche(2, "Ce que tu veux faire ressortir", `
+    <p>C'est ton <strong>thème</strong>, et il est déjà dans ta tension : c'est le côté qui fait mal.</p>
+    <p>Attention au piège : un thème ne se dit pas, il se <em>fait sentir</em>. N'écris jamais « elle comprit qu'il faut savoir dire non ». Montre-la dire oui une fois de trop, et laisse le lecteur conclure.</p>
+    <div class="mg-guide-key">Ton thème n'est pas une morale. C'est une question que tu poses sans y répondre complètement.</div>`) +
+
+  mgFiche(3, "Ton personnage : un défaut, un désir, une peur", `
+    <p>« Lou, 25 ans, curieuse et gentille » ne crée aucune histoire. Trois lignes suffisent, mais celles-ci :</p>
+    <div class="mg-guide-ex">
+      <strong>Désir</strong> — ce qu'elle veut, concrètement : retrouver la maison de son enfance.<br>
+      <strong>Peur</strong> — ce qu'elle fuit : découvrir qu'on l'y a oubliée.<br>
+      <strong>Défaut</strong> — ce qui lui coûtera : elle n'arrive pas à dire non.
+    </div>
+    <p>Le défaut est le plus important : c'est lui que chaque scène va tester.</p>
+    <div class="mg-guide-key">Un personnage qui veut quelque chose et qu'on empêche d'y arriver — c'est déjà toute une histoire.</div>`) +
+
+  mgFiche(4, "Le concret bat toujours l'abstrait", `
+    <p>Un détail précis vaut dix adjectifs. Compare :</p>
+    <div class="mg-guide-ex" style="background:#FEE2E2;color:#7f1d1d">« Elle était très nerveuse et mal à l'aise. »</div>
+    <div class="mg-guide-ex">« Elle a recompté trois fois la monnaie qu'elle avait déjà dans la main. »</div>
+    <p>La deuxième version ne dit jamais « nerveuse » — et c'est pour ça qu'on la croit.</p>
+    <div class="mg-guide-key">Règle de secours : quand une phrase te semble plate, remplace un adjectif par un geste.</div>`) +
+
+  mgFiche(5, "Commence petit, mais finis", `
+    <p>Un texte court terminé t'apprend dix fois plus qu'un roman abandonné au chapitre trois. Pour ta première fois : <strong>une scène, un jour, deux personnages.</strong></p>
+    <p>Finir est une compétence à part entière, et elle s'entraîne. La bonne nouvelle : elle s'entraîne vite.</p>`);
+}
+
+// ── Onglet : jeux de décision ──
+function mgAideJeux() {
+  return mgAideIntro('🎮', "Écrire un jeu de décision",
+    "Ici, ce n'est pas toi qui racontes : c'est le joueur qui décide. Ton travail n'est pas de raconter une belle histoire, mais de créer de belles hésitations.") +
+
+  mgFiche(1, "Tes jauges = ta tension visible", `
+    <p>Prends les deux forces de ta tension et fais-en tes deux jauges :</p>
+    <div class="mg-guide-pair"><span style="flex:1">aider ↔ se préserver</span><span style="flex:1;font-weight:600">❤️ Lien · 🔋 Énergie</span></div>
+    <div class="mg-guide-pair"><span style="flex:1">vérité ↔ garder les gens</span><span style="flex:1;font-weight:600">🪞 Sincérité · 🤝 Relations</span></div>
+    <div class="mg-guide-pair"><span style="flex:1">partir ↔ appartenir</span><span style="flex:1;font-weight:600">🧭 Liberté · 🏠 Racines</span></div>
+    <p style="margin-top:12px">Deux jauges suffisent largement. Trois, c'est déjà difficile à équilibrer.</p>
+    <p class="mg-muted">À savoir : pour l'instant les jauges bougent pendant la partie mais ne changent pas la fin automatiquement. Les fins dépendent du chemin de choix.</p>`, true) +
+
+  mgFiche(2, "Un choix doit coûter", `
+    <div class="mg-guide-key">Un bon choix fait <strong>monter une jauge et descendre l'autre</strong>. Si un choix ne coûte rien, ce n'est pas un choix — c'est une récompense.</div>
+    <p>Test rapide : lis tes deux options. Si tu sais laquelle est « la bonne », supprime-la, ou rends-la chère.</p>
+    <div class="mg-guide-ex">
+      « Ramasser les oranges avec elle » → ❤️ +2 · 🔋 −1<br>
+      « Passer ton chemin » → ❤️ −2 · 🔋 +1
+    </div>
+    <p>Aucune des deux n'est gratuite : c'est ça qui rend la décision intéressante.</p>`) +
+
+  mgFiche(3, "Vise petit : 5 rencontres, 2 ou 3 fins", `
+    <p>Ne construis pas un arbre géant, il explose en branches et tu abandonnes.</p>
+    <div class="mg-guide-tree">     Rencontre 1  (la mise en place)
+           ↓
+     Rencontre 2  (ça se complique)
+        ↙     ↘
+   Fin A       Fin B</div>
+    <div class="mg-guide-key">Pour éviter l'explosion : fais <strong>converger</strong> tes chemins. Deux choix différents peuvent mener à la même rencontre suivante — ce sont les jauges qui gardent la mémoire de ce qui a été choisi.</div>`) +
+
+  mgFiche(4, "Écris les choix avant la scène", `
+    <p>Contre-intuitif, mais très efficace. Note d'abord les 2 ou 3 décisions possibles, <strong>puis</strong> écris la situation qui rend ces décisions difficiles.</p>
+    <p>La scène n'existe que pour ça : donner au joueur juste assez d'informations pour hésiter, et pas assez pour être sûr.</p>`) +
+
+  mgFiche(5, "Le ton du texte d'une rencontre", `
+    <ul>
+      <li><strong>Court</strong> : 3 à 5 phrases. On lit sur un téléphone, entre deux choses.</li>
+      <li><strong>Au présent</strong> : « Elle lâche son sac » — pas « elle lâcha ».</li>
+      <li><strong>À la deuxième personne</strong> : « tu vois », « tu entends ». C'est ce qui donne l'impression d'y être.</li>
+      <li><strong>Finis sur le problème</strong>, jamais sur la solution : la dernière phrase doit laisser le joueur en suspens.</li>
+    </ul>
+    <div class="mg-guide-ex">« En sortant du marché, tu vois une vieille dame lâcher son sac. Les oranges roulent sur le trottoir. Personne ne s'arrête. Tu es déjà en retard. »</div>`) +
+
+  mgFiche(6, "Teste tôt, teste souvent", `
+    <p>Le bouton <strong>▶️ Tester</strong> est ton meilleur relecteur. Joue ton jeu après chaque rencontre ajoutée, et surtout : joue le chemin que tu n'avais pas prévu.</p>
+    <div class="mg-guide-key">Si en jouant tu choisis toujours la même option, c'est que l'autre n'est pas assez tentante. Rends-la meilleure au lieu d'affaiblir la première.</div>`);
+}
+
+// ── Onglet : histoires ──
+function mgAideHistoires() {
+  return mgAideIntro('✍️', "Écrire une histoire",
+    "Pas de jauges, pas de branches : une seule ligne, et c'est toi qui décides de tout. La difficulté change de place — elle passe dans le rythme.") +
+
+  mgFiche(1, "Trois mouvements, pas trois actes", `
+    <p>Oublie les théories compliquées. Toute histoire qui tient debout fait ça :</p>
+    <div class="mg-guide-tree">1. Une situation stable
+2. Quelque chose la fait basculer
+3. Rien ne redevient comme avant</div>
+    <p>Le point 2 arrive <strong>vite</strong> — dans le premier tiers. Si tu es à la moitié de ton texte et que rien n'a encore basculé, tu es en train d'écrire une introduction, pas une histoire.</p>
+    <div class="mg-guide-key">Test de la fin : quelque chose a-t-il changé pour ton personnage ? Si non, tu as écrit une situation, pas une histoire.</div>`, true) +
+
+  mgFiche(2, "Une scène = un lieu, un moment, un changement", `
+    <p>C'est la brique de base. Si tu ne sais pas quoi écrire, écris <em>une scène</em>, pas « un chapitre ».</p>
+    <p>Une scène qui ne change rien est une scène à couper — même si elle est jolie. Surtout si elle est jolie.</p>
+    <div class="mg-guide-ex">Entrée : elle veut récupérer ses affaires.<br>Sortie : elle a ses affaires, mais elle sait qu'on lui a menti.</div>`) +
+
+  mgFiche(3, "Montrer plutôt que raconter", `
+    <p>Le conseil le plus répété, et le plus utile :</p>
+    <div class="mg-guide-ex" style="background:#FEE2E2;color:#7f1d1d">« Son père était un homme froid qui ne savait pas montrer ses sentiments. »</div>
+    <div class="mg-guide-ex">« Il a posé le café devant elle, s'est assis en face, et a déplié son journal. »</div>
+    <p>Mais garde le raccourci quand c'est utile : on ne montre pas tout, sinon on n'avance plus. Raconte ce qui est secondaire, montre ce qui compte.</p>`) +
+
+  mgFiche(4, "Le dialogue : ce qu'on ne dit pas", `
+    <p>Dans la vraie vie, personne ne répond à la question posée. Les gens dévient, se taisent, changent de sujet — et c'est là que ça devient intéressant.</p>
+    <div class="mg-guide-ex">— Tu rentres quand ?<br>— J'ai pris du pain.</div>
+    <p>Trois règles simples :</p>
+    <ul>
+      <li><strong>« dit-il » suffit.</strong> Pas besoin de « rétorqua-t-il sèchement » : si la réplique est bonne, le ton s'entend tout seul.</li>
+      <li><strong>Coupe les bonjours.</strong> Entre dans la conversation quand elle a déjà commencé.</li>
+      <li><strong>Un geste vaut une réplique.</strong> Elle repose sa tasse — on a compris.</li>
+    </ul>`) +
+
+  mgFiche(5, "Commence tard, finis tôt", `
+    <p>Le principe qui sauve le plus de textes. Entre dans la scène <strong>le plus tard possible</strong> (juste avant que ça se passe) et sors-en <strong>le plus tôt possible</strong> (juste après).</p>
+    <p>Tout ce qui est avant est du réchauffement, tout ce qui est après est de l'explication. Coupe les deux.</p>
+    <div class="mg-guide-key">Relis ton début : ta vraie première phrase est souvent la troisième.</div>`) +
+
+  mgFiche(6, "La première phrase, la dernière", `
+    <p><strong>La première</strong> ne doit pas être belle, elle doit donner envie de lire la deuxième. Une question, une anomalie, une image concrète.</p>
+    <p><strong>La dernière</strong> ne doit rien expliquer. Elle doit résonner. Souvent, la meilleure fin est <em>une phrase avant</em> celle que tu as écrite.</p>`) +
+
+  mgFiche(7, "Réécrire, c'est là que ça se joue", `
+    <p>Personne n'écrit bien du premier coup. Trois passes suffisent :</p>
+    <ul>
+      <li><strong>Le lendemain</strong>, jamais le soir même : tu verras ce que tu ne vois pas ce soir.</li>
+      <li><strong>À voix haute</strong> : là où tu butes, le lecteur butera.</li>
+      <li><strong>Coupe 10 %</strong> : impose-toi le chiffre. Ce sont presque toujours des adverbes, des explications et des politesses.</li>
+    </ul>
+    <div class="mg-guide-key">Ne réécris pas en écrivant. Finis d'abord le brouillon, même mauvais — un texte fini se répare, une page blanche non.</div>`);
+}
+
+// ── Onglet : débloquer ──
+function mgAideDebloquer() {
+  return mgAideIntro('🧯', "Quand ça coince",
+    "Le blocage n'est presque jamais un manque d'inspiration. C'est presque toujours une question à laquelle tu n'as pas encore répondu.") +
+
+  mgFiche('A', "Page blanche : 5 sorties de secours", `
+    <ul>
+      <li><strong>Écris la scène du milieu.</strong> Le début est la partie la plus difficile — commence par celle que tu vois déjà.</li>
+      <li><strong>Interviewe ton personnage.</strong> Trois questions : qu'est-ce que tu veux ? qu'est-ce qui t'en empêche ? qu'est-ce que tu caches ?</li>
+      <li><strong>Dix minutes sans t'arrêter.</strong> Interdiction de relire ou de corriger. C'est du brouillon, ça ne compte pas — c'est justement pour ça que ça marche.</li>
+      <li><strong>« Et si… »</strong> Prends ta situation et casse-la : et si elle arrivait trop tard ? et si l'autre mentait ? et si c'était sa faute ?</li>
+      <li><strong>Vole une structure.</strong> Prends l'ossature d'une histoire que tu aimes et remplis-la avec la tienne. Personne ne le verra.</li>
+    </ul>
+    <p>Va voir ton onglet <strong>💡 Idées</strong> : tu y as sûrement laissé de quoi commencer.</p>`, true) +
+
+  mgFiche('B', "Ça coince au milieu", `
+    <p>Le milieu s'effondre presque toujours pour la même raison : <strong>ton personnage subit au lieu d'agir.</strong></p>
+    <p>Trois réparations :</p>
+    <ul>
+      <li>Donne-lui une décision à prendre maintenant, pas dans trois scènes.</li>
+      <li>Fais rater quelque chose. Un échec relance mieux qu'une réussite.</li>
+      <li>Enlève-lui une solution de repli — quelqu'un, un lieu, une certitude.</li>
+    </ul>
+    <div class="mg-guide-key">Si tu t'ennuies en écrivant une scène, le lecteur s'ennuiera trois fois plus. Coupe-la ou fais-y arriver un problème.</div>`) +
+
+  mgFiche('C', "Tu détestes ce que tu écris", `
+    <p>C'est normal, et c'est même bon signe : ton goût est meilleur que ton niveau actuel, et c'est exactement ce qui te fera progresser.</p>
+    <ul>
+      <li>Ne juge jamais un brouillon. Ce n'est pas du travail raté, c'est de la matière première.</li>
+      <li>Range-le trois jours, relis sans stylo. Il sera moins mauvais que dans ton souvenir.</li>
+      <li>Cherche <strong>une seule phrase</strong> que tu aimes. Construis autour d'elle.</li>
+    </ul>`) +
+
+  mgFiche('✓', "Le pense-bête", `
+    <ul>
+      <li>Ma tension tient en une phrase.</li>
+      <li>Mon personnage a un défaut, pas des qualités.</li>
+      <li>Quelque chose bascule dans le premier tiers.</li>
+      <li>Je montre les choses qui comptent, je raconte le reste.</li>
+      <li>Chaque scène change quelque chose — sinon je la coupe.</li>
+      <li>Pour un jeu : chaque choix coûte, aucun n'est évidemment le bon.</li>
+      <li>Je finis le brouillon avant de le réparer.</li>
+    </ul>`);
 }
 
 // ═══════════════════════════════════════════════════════
