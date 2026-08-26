@@ -591,7 +591,6 @@ function sumQty(entries) {
 // ROUTAGE — History API (hash-based)
 // ═══════════════════════════════════════════════════════
 let _charlotAuthenticated = false;
-let _margotAuthenticated  = false;
 
 function navigate(hash) {
   history.pushState({hash}, '', hash || '#');
@@ -643,7 +642,6 @@ function dispatchHash(hash) {
   } else if (section === 'margot') {
     document.body.classList.remove('maison-mode');
     document.body.classList.add('portal-mode');
-    if (!_margotAuthenticated) { showPinPrompt('margot'); return; }
     _margotTab     = parts[1] || 'home';
     _margotJeuId   = parts[2] || null;
     _margotView    = parts[3] || null;
@@ -814,11 +812,11 @@ function renderPortal() {
           <div class="portal-link" onclick="event.stopPropagation();showAnimaux()"><span class="pl-icon">🐾</span> Animaux</div>
         </div>
       </div>
-      <div class="portal-card" onclick="showPinPrompt('margot')">
+      <div class="portal-card" onclick="navigate('#margot')">
         <div class="pc-avatar">👩</div>
         <div class="pc-name">Margot</div>
-        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel · 🎮 Jeux</div>
-        <div class="pc-badge">🔒 Accès privé</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
+        <div class="pc-badge">🎮 Jeux de décision</div>
       </div>
       <div class="portal-card soon" onclick="showPinPrompt('charlot')">
         <div class="pc-avatar">👦</div>
@@ -829,7 +827,7 @@ function renderPortal() {
     </div>`;
 }
 
-const SPACE_PASSWORDS = { margot: '300626', charlot: '300626' };
+const SPACE_PASSWORDS = { charlot: '300626' };
 let _pinValue = '';
 let _pinPerson = '';
 
@@ -887,7 +885,6 @@ function checkPin() {
   updatePinDots();
   if (_pinValue === SPACE_PASSWORDS[_pinPerson]) {
     if (_pinPerson === 'charlot') _charlotAuthenticated = true;
-    if (_pinPerson === 'margot')  _margotAuthenticated  = true;
     navigate('#' + _pinPerson);
   } else {
     _pinValue = '';
