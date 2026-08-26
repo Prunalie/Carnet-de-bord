@@ -181,6 +181,26 @@ body.maison-mode #maison-app{display:block}
 .mg-choice-btn{display:block;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;margin-bottom:10px;cursor:pointer;font-size:.92rem;font-weight:600;color:var(--text);font-family:inherit;transition:.15s}
 .mg-choice-btn:hover{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
 .mg-conseq{background:var(--green-light);border:1px solid var(--green);border-radius:var(--radius);padding:16px;margin-bottom:16px;white-space:pre-wrap;line-height:1.5}
+/* ── Margot — conseils d'ecriture ── */
+.mg-guide-cta{display:flex;align-items:center;gap:12px;background:var(--amber-light);border:1.5px solid var(--amber);border-radius:var(--radius);padding:13px 16px;margin-bottom:14px;cursor:pointer;font-size:.9rem;transition:.15s}
+.mg-guide-cta:hover{background:#fbedd3}
+.mg-guide{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.mg-guide>summary{padding:14px 16px;cursor:pointer;font-weight:700;color:var(--green-dark);font-size:.95rem;display:flex;align-items:center;gap:10px;list-style:none}
+.mg-guide>summary::-webkit-details-marker{display:none}
+.mg-guide>summary::after{content:'\25BE';margin-left:auto;color:var(--text-muted);transition:transform .2s}
+.mg-guide[open]>summary::after{transform:rotate(180deg)}
+.mg-guide[open]>summary{border-bottom:1px solid var(--border)}
+.mg-guide-num{background:var(--green);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+.mg-guide-body{padding:14px 16px;font-size:.9rem;line-height:1.6}
+.mg-guide-body p{margin-bottom:10px}
+.mg-guide-body ul{margin:0 0 10px 20px}
+.mg-guide-body li{margin-bottom:5px}
+.mg-guide-body .mg-muted{margin-bottom:0}
+.mg-guide-ex{background:var(--green-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px;font-size:.87rem;font-style:italic}
+.mg-guide-key{background:var(--amber-light);border-left:3px solid var(--amber);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:10px 12px;margin-bottom:10px;font-size:.87rem}
+.mg-guide-tree{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;white-space:pre;overflow-x:auto;margin-bottom:10px}
+.mg-guide-pair{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--green-light);font-size:.87rem}
+.mg-guide-pair:last-child{border-bottom:none}
 /* ── Animaux ── */
 .anim-pet-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:border-color .2s,transform .2s}
 .anim-pet-card:hover{border-color:var(--green);transform:translateY(-2px)}
@@ -914,8 +934,9 @@ let _margotView    = null;   // null | 'modifier' | 'scene' | 'jouer'
 let _margotSceneId = null;
 
 const MG_TABS = [
-  {id:'home', icon:'🏠', label:'Accueil'},
-  {id:'jeux', icon:'🎮', label:'Mes jeux'},
+  {id:'home',  icon:'🏠', label:'Accueil'},
+  {id:'jeux',  icon:'🎮', label:'Mes jeux'},
+  {id:'guide', icon:'💡', label:'Conseils'},
 ];
 
 function setMargotTab(id) { navigate('#margot/' + id); }
@@ -970,6 +991,10 @@ function renderMargotSpace() {
       title = 'Mes jeux'; back = '#';
       content = renderJeuxListe();
     }
+  } else if (_margotTab === 'guide') {
+    title = 'Conseils d\'écriture';
+    content = renderMargotGuide();
+
   } else {
     content = renderMargotHome();
   }
@@ -1008,6 +1033,11 @@ function renderMargotHome() {
         <div style="color:var(--text-muted);font-size:1.2rem">›</div>
       </div>
     </div>
+    <div class="mg-guide-cta" onclick="navigate('#margot/guide')">
+      <span style="font-size:1.3rem">💡</span>
+      <span style="flex:1"><strong>Comment écrire mon histoire</strong><br><span class="mg-muted">Par où commencer, en 5 étapes</span></span>
+      <span style="color:var(--text-muted)">›</span>
+    </div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer un nouveau jeu</button>`;
 }
 
@@ -1038,6 +1068,11 @@ function renderJeuxListe() {
     <div class="section-header" style="margin-bottom:14px">
       <h2 style="font-size:1.15rem;color:var(--green-dark)">🎮 Mes jeux de décision</h2>
       <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Nouveau jeu</button>
+    </div>
+    <div class="mg-guide-cta" onclick="navigate('#margot/guide')">
+      <span style="font-size:1.3rem">💡</span>
+      <span style="flex:1"><strong>Comment écrire mon histoire</strong><br><span class="mg-muted">Par où commencer, en 5 étapes</span></span>
+      <span style="color:var(--text-muted)">›</span>
     </div>
     ${list.length ? cards : `
       <div class="empty-state">
@@ -1423,6 +1458,76 @@ function saveScene(jeuId, sceneId) {
   save();
   showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
   navigate('#margot/jeux/' + jeuId);
+}
+
+// ── Conseils d'écriture ──
+function mgGuideSection(num, titre, corps, open) {
+  return `<details class="mg-guide"${open ? ' open' : ''}>
+    <summary><span class="mg-guide-num">${num}</span>${titre}</summary>
+    <div class="mg-guide-body">${corps}</div>
+  </details>`;
+}
+
+function renderMargotGuide() {
+  return `
+    <div class="mg-card" style="background:var(--green-dark);color:#fff;border:none">
+      <div style="font-size:1.6rem;margin-bottom:6px">💡</div>
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">Comment écrire mon histoire</div>
+      <p style="font-size:.88rem;line-height:1.5;opacity:.9">Dans un jeu de décision, ce n'est pas l'histoire qui compte le plus — c'est la <strong>tension</strong>. La vue d'ensemble dont tu as besoin tient en quatre lignes, pas en un plan détaillé.</p>
+    </div>
+
+    ${mgGuideSection(1, 'Commence par une tension', `
+      <p>Un sujet (« une journée à Paris ») ne produit pas de bons choix. Une tension, si. C'est deux choses désirables qui ne peuvent pas coexister :</p>
+      <ul>
+        <li>aider les autres <strong>contre</strong> se préserver</li>
+        <li>dire la vérité <strong>contre</strong> garder quelqu'un</li>
+        <li>partir <strong>contre</strong> appartenir quelque part</li>
+        <li>être aimée <strong>contre</strong> être honnête</li>
+      </ul>
+      <p>Écris <strong>une seule phrase</strong> :</p>
+      <div class="mg-guide-ex">« Mon jeu demande au joueur : jusqu'où on aide quelqu'un avant de se perdre soi-même ? »</div>
+      <p>Cette phrase, c'est ta boussole. Chaque fois que tu hésiteras sur un choix à écrire, tu reviendras à elle. Elle a sa place dans le <strong>pitch</strong> de ton jeu.</p>
+      <div class="mg-guide-key">Ce que tu veux « faire ressortir » est déjà là : c'est le côté de la tension qui fait mal.</div>`, true)}
+
+    ${mgGuideSection(2, 'Tes jauges = ta tension visible', `
+      <p>C'est l'astuce la plus utile. Prends les deux forces de ta tension et fais-en tes deux jauges :</p>
+      <div class="mg-guide-pair"><span style="flex:1">aider ↔ se préserver</span><span style="flex:1;font-weight:600">❤️ Lien · 🔋 Énergie</span></div>
+      <div class="mg-guide-pair"><span style="flex:1">vérité ↔ garder les gens</span><span style="flex:1;font-weight:600">🪞 Sincérité · 🤝 Relations</span></div>
+      <div class="mg-guide-pair"><span style="flex:1">partir ↔ appartenir</span><span style="flex:1;font-weight:600">🧭 Liberté · 🏠 Racines</span></div>
+      <p style="margin-top:12px">À partir de là, ton jeu s'écrit presque tout seul :</p>
+      <div class="mg-guide-key">Un bon choix fait <strong>monter une jauge et descendre l'autre</strong>. Si un choix ne coûte rien, ce n'est pas un choix — c'est une récompense.</div>
+      <p class="mg-muted">À savoir : pour l'instant les jauges s'affichent et bougent pendant la partie, mais elles ne changent pas la fin automatiquement. Les fins dépendent uniquement du chemin de choix.</p>`)}
+
+    ${mgGuideSection(3, 'Donne un défaut à ton personnage', `
+      <p>« Lou, 25 ans, curieuse et gentille » ne crée aucune histoire.</p>
+      <div class="mg-guide-ex">« Lou n'arrive pas à dire non. »</div>
+      <p>Celui-là en crée une immédiatement : chaque rencontre devient une occasion de tester ce défaut. Écris-le dans la case <strong>« Qui est-il / elle ? »</strong> de ton personnage principal.</p>`)}
+
+    ${mgGuideSection(4, 'Vise petit pour la première version', `
+      <p>Ne construis pas un arbre géant : il explose en branches et tu abandonnes. La forme qui marche :</p>
+      <div class="mg-guide-tree">     Rencontre 1  (la mise en place)
+           ↓
+     Rencontre 2  (ça se complique)
+        ↙     ↘
+   Fin A       Fin B</div>
+      <p><strong>5 rencontres, 2 ou 3 fins.</strong> Tu ajoutes des branches ensuite, une fois que tu sais que ça tient.</p>
+      <div class="mg-guide-key">Pour éviter l'explosion : fais <strong>converger</strong> tes chemins. Deux choix différents peuvent mener à la même rencontre suivante — ce sont les jauges qui gardent la mémoire de ce qui a été choisi.</div>`)}
+
+    ${mgGuideSection(5, 'Écris les choix avant la scène', `
+      <p>Contre-intuitif, mais très efficace. Note d'abord les 2 ou 3 décisions possibles, <strong>puis</strong> écris la situation qui rend ces décisions difficiles. La scène n'existe que pour ça.</p>
+      <div class="mg-guide-key">Un bon test : si l'un des choix est évidemment le « bon », supprime-le ou rends-le coûteux.</div>`)}
+
+    ${mgGuideSection('✓', 'Le pense-bête', `
+      <ul>
+        <li>Ma tension tient en une phrase.</li>
+        <li>Mes deux jauges sont les deux côtés de cette tension.</li>
+        <li>Mon personnage a un défaut, pas des qualités.</li>
+        <li>Chaque choix coûte quelque chose.</li>
+        <li>Aucun choix n'est évidemment le bon.</li>
+        <li>5 rencontres, 2 ou 3 fins — pas plus pour commencer.</li>
+      </ul>`)}
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer un jeu</button>`;
 }
 
 // ── Mode test : jouer la partie ──
