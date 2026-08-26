@@ -164,6 +164,23 @@ body.maison-mode #maison-app{display:block}
 .ch-stat.orange .val{color:#f59e0b}
 .ch-section-total{background:var(--green-light,#f0fdf4);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.88rem}
 @media(prefers-color-scheme:dark){.ch-badge-paye.oui{background:#064e3b;color:#6ee7b7}.ch-badge-paye.non{background:#7f1d1d;color:#fca5a5}}
+/* ── Margot — jeux de decision ── */
+.mg-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:.2s}
+.mg-card.clickable{cursor:pointer}
+.mg-card.clickable:hover{border-color:var(--green);transform:translateY(-2px)}
+.mg-card-title{font-weight:700;color:var(--green-dark);font-size:1rem}
+.mg-muted{font-size:.82rem;color:var(--text-muted)}
+.mg-scene{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--green);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
+.mg-scene.depart{border-left-color:var(--amber);background:var(--amber-light)}
+.mg-choice-edit{border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--bg)}
+.mg-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;background:var(--green-light);color:var(--green-dark)}
+.mg-badge.amber{background:var(--amber-light);color:#8a6520}
+.mg-jauges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.mg-jauge{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:.8rem;font-weight:600}
+.mg-play-text{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:1rem;line-height:1.6;white-space:pre-wrap;margin-bottom:16px}
+.mg-choice-btn{display:block;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;margin-bottom:10px;cursor:pointer;font-size:.92rem;font-weight:600;color:var(--text);font-family:inherit;transition:.15s}
+.mg-choice-btn:hover{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
+.mg-conseq{background:var(--green-light);border:1px solid var(--green);border-radius:var(--radius);padding:16px;margin-bottom:16px;white-space:pre-wrap;line-height:1.5}
 /* ── Animaux ── */
 .anim-pet-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:border-color .2s,transform .2s}
 .anim-pet-card:hover{border-color:var(--green);transform:translateY(-2px)}
@@ -532,6 +549,14 @@ function ensureStateFields() {
   if (!state.animaux) state.animaux = {taika:[],oslo:[]};
   if (!state.animaux.taika) state.animaux.taika = [];
   if (!state.animaux.oslo)  state.animaux.oslo  = [];
+  if (!state.margot) state.margot = {jeux:[]};
+  if (!state.margot.jeux) state.margot.jeux = [];
+  state.margot.jeux.forEach(j => {
+    if (!j.scenes) j.scenes = [];
+    if (!j.jauges) j.jauges = [];
+    if (!j.personnage) j.personnage = {nom:'',emoji:'🙂',description:''};
+    j.scenes.forEach(sc => { if (!sc.choix) sc.choix = []; sc.choix.forEach(c => { if (!c.effets) c.effets = {}; }); });
+  });
   if (!state.charlot) state.charlot = {prestations:[],pensions:[],cours:[],charges:[]};
   if (state.charlot.contrats && !state.charlot.prestations) { state.charlot.prestations = state.charlot.contrats; delete state.charlot.contrats; }
   if (!state.charlot.prestations) state.charlot.prestations = [];
@@ -619,6 +644,10 @@ function dispatchHash(hash) {
     document.body.classList.remove('maison-mode');
     document.body.classList.add('portal-mode');
     if (!_margotAuthenticated) { showPinPrompt('margot'); return; }
+    _margotTab     = parts[1] || 'home';
+    _margotJeuId   = parts[2] || null;
+    _margotView    = parts[3] || null;
+    _margotSceneId = parts[4] || null;
     renderMargotSpace();
   }
 }
@@ -785,10 +814,10 @@ function renderPortal() {
           <div class="portal-link" onclick="event.stopPropagation();showAnimaux()"><span class="pl-icon">🐾</span> Animaux</div>
         </div>
       </div>
-      <div class="portal-card soon" onclick="showPinPrompt('margot')">
+      <div class="portal-card" onclick="showPinPrompt('margot')">
         <div class="pc-avatar">👩</div>
         <div class="pc-name">Margot</div>
-        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel · 🎮 Jeux</div>
         <div class="pc-badge">🔒 Accès privé</div>
       </div>
       <div class="portal-card soon" onclick="showPinPrompt('charlot')">
@@ -868,20 +897,611 @@ function checkPin() {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+// ESPACE MARGOT — Jeux de décision
+// ═══════════════════════════════════════════════════════
+let _margotTab     = 'home';
+let _margotJeuId   = null;
+let _margotView    = null;   // null | 'modifier' | 'scene' | 'jouer'
+let _margotSceneId = null;
+
+const MG_TABS = [
+  {id:'home', icon:'🏠', label:'Accueil'},
+  {id:'jeux', icon:'🎮', label:'Mes jeux'},
+];
+
+function setMargotTab(id) { navigate('#margot/' + id); }
+
+function mgJeux() {
+  if (!state.margot) state.margot = {jeux:[]};
+  if (!state.margot.jeux) state.margot.jeux = [];
+  return state.margot.jeux;
+}
+function mgJeu(id)          { return mgJeux().find(j => j.id === id) || null; }
+function mgScenes(jeu)      { return (jeu && jeu.scenes) || []; }
+function mgScene(jeu, id)   { return mgScenes(jeu).find(s => s.id === id) || null; }
+function mgJauges(jeu)      { return (jeu && jeu.jauges) || []; }
+function mgSceneDepart(jeu) {
+  if (jeu.sceneDepart && mgScene(jeu, jeu.sceneDepart)) return jeu.sceneDepart;
+  return mgScenes(jeu)[0] ? mgScenes(jeu)[0].id : null;
+}
+
 function renderMargotSpace() {
+  let content = '', title = 'Espace Margot', back = '#', showNav = true;
+
+  if (_margotTab === 'jeux') {
+    const jeu = (_margotJeuId && _margotJeuId !== 'nouveau') ? mgJeu(_margotJeuId) : null;
+
+    if (_margotJeuId === 'nouveau') {
+      title = 'Nouveau jeu'; back = '#margot/jeux'; showNav = false;
+      content = renderJeuForm(null);
+
+    } else if (_margotJeuId && !jeu) {
+      title = 'Mes jeux'; back = '#margot/jeux';
+      content = `<div class="empty-state"><div class="icon">🤔</div><p>Ce jeu n'existe plus.</p>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/jeux')">Retour aux jeux</button></div>`;
+
+    } else if (jeu && _margotView === 'modifier') {
+      title = 'Modifier le jeu'; back = '#margot/jeux/' + jeu.id; showNav = false;
+      content = renderJeuForm(jeu.id);
+
+    } else if (jeu && _margotView === 'scene') {
+      title = _margotSceneId === 'nouvelle' ? 'Nouvelle rencontre' : 'Modifier la rencontre';
+      back = '#margot/jeux/' + jeu.id; showNav = false;
+      content = renderSceneForm(jeu.id, _margotSceneId);
+
+    } else if (jeu && _margotView === 'jouer') {
+      title = jeu.titre || 'Partie'; back = '#margot/jeux/' + jeu.id; showNav = false;
+      content = renderJeuPlay(jeu.id);
+
+    } else if (jeu) {
+      title = jeu.titre || 'Jeu'; back = '#margot/jeux'; showNav = false;
+      content = renderJeuDetail(jeu.id);
+
+    } else {
+      title = 'Mes jeux'; back = '#';
+      content = renderJeuxListe();
+    }
+  } else {
+    content = renderMargotHome();
+  }
+
+  const nav = showNav ? `<div class="ch-nav">${MG_TABS.map(t =>
+    `<button class="${t.id===_margotTab?'active':''}" onclick="setMargotTab('${t.id}')">
+      <span class="ch-ni">${t.icon}</span>${t.label}
+    </button>`).join('')}</div>` : '';
+
   document.getElementById('portal').innerHTML = `
-    <div class="portal-hero">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="navigate('#')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">← Accueil</button>
-        <div style="font-size:1.6rem">👩</div>
-        <h1 style="font-size:1.2rem;font-weight:700;margin:0">Espace Margot</h1>
+    <div style="background:var(--green-dark);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
+      <button onclick="navigate('${back}')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:.88rem;font-weight:600">←</button>
+      <span style="font-size:1.3rem">👩</span>
+      <h1 style="font-size:1.1rem;font-weight:700;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(title)}</h1>
+    </div>
+    <div style="padding:16px;max-width:800px;margin:0 auto;padding-bottom:${showNav?'90px':'30px'}">${content}</div>
+    ${nav}`;
+}
+
+function renderMargotHome() {
+  const nb = mgJeux().length;
+  const nbScenes = mgJeux().reduce((s,j)=>s+mgScenes(j).length,0);
+  return `
+    <div style="text-align:center;padding:16px 0 24px">
+      <div style="font-size:3.4rem">👩</div>
+      <h2 style="font-size:1.3rem;margin:8px 0 4px">Bonjour Margot !</h2>
+      <p class="mg-muted">Ton espace personnel</p>
+    </div>
+    <div class="mg-card clickable" onclick="navigate('#margot/jeux')">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:2.2rem">🎮</div>
+        <div style="flex:1">
+          <div class="mg-card-title">Mes jeux de décision</div>
+          <div class="mg-muted">${nb} jeu${nb>1?'x':''} · ${nbScenes} rencontre${nbScenes>1?'s':''}</div>
+        </div>
+        <div style="color:var(--text-muted);font-size:1.2rem">›</div>
       </div>
     </div>
-    <div style="padding:60px 20px;text-align:center">
-      <div style="font-size:4rem;margin-bottom:16px">👩</div>
-      <h2 style="font-size:1.3rem;margin-bottom:8px">Bonjour Margot !</h2>
-      <p style="color:var(--text-muted)">Ton espace personnel arrive bientôt.</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer un nouveau jeu</button>`;
+}
+
+// ── Liste des jeux ──
+function renderJeuxListe() {
+  const list = mgJeux();
+  const cards = list.map(j => {
+    const nbS = mgScenes(j).length;
+    const nbC = mgScenes(j).reduce((s,sc)=>s+((sc.choix||[]).length),0);
+    return `
+    <div class="mg-card clickable" onclick="navigate('#margot/jeux/${j.id}')">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:2rem;line-height:1">${j.emoji || '🎲'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mg-card-title">${escHtml(j.titre)}</div>
+          ${j.resume ? `<div class="mg-muted" style="margin-top:3px">${escHtml(j.resume)}</div>` : ''}
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+            ${j.personnage && j.personnage.nom ? `<span class="mg-badge">${j.personnage.emoji||'🙂'} ${escHtml(j.personnage.nom)}</span>` : ''}
+            <span class="mg-badge amber">🎬 ${nbS} rencontre${nbS>1?'s':''}</span>
+            <span class="mg-badge amber">🔀 ${nbC} choix</span>
+          </div>
+        </div>
+      </div>
     </div>`;
+  }).join('');
+
+  return `
+    <div class="section-header" style="margin-bottom:14px">
+      <h2 style="font-size:1.15rem;color:var(--green-dark)">🎮 Mes jeux de décision</h2>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Nouveau jeu</button>
+    </div>
+    ${list.length ? cards : `
+      <div class="empty-state">
+        <div class="icon">🎲</div>
+        <p>Aucun jeu pour l'instant.</p>
+        <p style="font-size:.85rem;margin-top:6px">Crée ton personnage principal, puis ajoute les personnes qu'il croise et les décisions à prendre.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer mon premier jeu</button>
+      </div>`}`;
+}
+
+// ── Formulaire de création / modification d'un jeu ──
+let _jf = {jauges: []};
+
+function renderJeuForm(id) {
+  const j = id ? mgJeu(id) : null;
+  _jf.jauges = j ? JSON.parse(JSON.stringify(mgJauges(j))) : [];
+  const p = (j && j.personnage) || {};
+  return `
+    <div class="mg-card">
+      <h2 style="font-size:1.05rem;color:var(--green-dark);margin-bottom:4px">${j ? 'Modifier le jeu' : 'Créer un nouveau jeu'}</h2>
+      <p class="mg-muted" style="margin-bottom:16px">Le décor de ton histoire : qui joue, et dans quel monde.</p>
+
+      <div class="form-group">
+        <label>Titre du jeu *</label>
+        <input type="text" id="jf-titre" placeholder="Ex : Une journée à Paris" value="${escHtml(j?j.titre:'')}">
+      </div>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Emoji du jeu</label>
+          <input type="text" id="jf-emoji" maxlength="4" placeholder="🎲" value="${escHtml(j?(j.emoji||''):'')}">
+        </div>
+        <div class="form-group">
+          <label>Genre / ambiance</label>
+          <input type="text" id="jf-genre" placeholder="Ex : aventure, romance, enquête" value="${escHtml(j?(j.genre||''):'')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Pitch — de quoi ça parle ?</label>
+        <textarea id="jf-resume" placeholder="Ex : Tu arrives dans une ville inconnue. Chaque personne que tu croises peut changer ta journée." style="min-height:70px">${escHtml(j?(j.resume||''):'')}</textarea>
+      </div>
+
+      <hr>
+      <h3 style="font-size:.95rem;color:var(--green-dark);margin-bottom:10px">🙂 Le personnage principal</h3>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Son prénom</label>
+          <input type="text" id="jf-perso-nom" placeholder="Ex : Lou" value="${escHtml(p.nom||'')}">
+        </div>
+        <div class="form-group">
+          <label>Son emoji</label>
+          <input type="text" id="jf-perso-emoji" maxlength="4" placeholder="🙂" value="${escHtml(p.emoji||'')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Qui est-il / elle ?</label>
+        <textarea id="jf-perso-desc" placeholder="Ex : 25 ans, curieuse, un peu trop gentille, vient d'arriver en ville." style="min-height:60px">${escHtml(p.description||'')}</textarea>
+      </div>
+
+      <hr>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap">
+        <h3 style="font-size:.95rem;color:var(--green-dark);margin:0">📊 Les jauges (optionnel)</h3>
+        <button class="btn btn-outline btn-sm" onclick="mgAddJauge()">＋ Ajouter une jauge</button>
+      </div>
+      <p class="mg-muted" style="margin-bottom:10px">Ce qui monte ou descend selon les décisions : humeur, argent, confiance…</p>
+      <div id="jf-jauges">${mgJaugeRows()}</div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-outline" onclick="navigate('${j ? '#margot/jeux/'+j.id : '#margot/jeux'}')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveJeu(${j ? `'${j.id}'` : ''})">${j ? 'Enregistrer' : 'Créer le jeu'}</button>
+      </div>
+    </div>`;
+}
+
+function mgJaugeRows() {
+  if (!_jf.jauges.length) return `<p class="mg-muted" style="font-style:italic">Aucune jauge — les choix mèneront simplement d'une rencontre à l'autre.</p>`;
+  return _jf.jauges.map((jg,i) => `
+    <div class="mg-choice-edit" style="display:grid;grid-template-columns:60px 1fr 90px 34px;gap:6px;align-items:center;padding:8px">
+      <input type="text" id="jf-j${i}-emoji" maxlength="4" placeholder="❤️" value="${escHtml(jg.emoji||'')}">
+      <input type="text" id="jf-j${i}-nom" placeholder="Nom de la jauge" value="${escHtml(jg.nom||'')}">
+      <input type="number" id="jf-j${i}-depart" placeholder="Départ" value="${jg.depart===undefined?10:jg.depart}">
+      <button class="del-btn" onclick="mgRemoveJauge(${i})" title="Supprimer">×</button>
+    </div>`).join('');
+}
+
+function mgSyncJauges() {
+  _jf.jauges = _jf.jauges.map((jg,i) => ({
+    id: jg.id,
+    emoji: document.getElementById(`jf-j${i}-emoji`)?.value.trim() ?? jg.emoji,
+    nom:   document.getElementById(`jf-j${i}-nom`)?.value.trim() ?? jg.nom,
+    depart: parseInt(document.getElementById(`jf-j${i}-depart`)?.value, 10) || 0,
+  }));
+}
+function mgAddJauge() {
+  mgSyncJauges();
+  _jf.jauges.push({id:uid(), emoji:'', nom:'', depart:10});
+  document.getElementById('jf-jauges').innerHTML = mgJaugeRows();
+}
+function mgRemoveJauge(i) {
+  mgSyncJauges();
+  _jf.jauges.splice(i,1);
+  document.getElementById('jf-jauges').innerHTML = mgJaugeRows();
+}
+
+function saveJeu(id) {
+  const g = el => (document.getElementById(el)?.value || '').trim();
+  const titre = g('jf-titre');
+  if (!titre) { alert('Donne un titre à ton jeu.'); document.getElementById('jf-titre')?.focus(); return; }
+  mgSyncJauges();
+  const jauges = _jf.jauges.filter(jg => jg.nom);
+
+  const existant = id ? mgJeu(id) : null;
+  const jeu = {
+    id: id || uid(),
+    titre,
+    emoji: g('jf-emoji') || '🎲',
+    genre: g('jf-genre'),
+    resume: g('jf-resume'),
+    personnage: {
+      nom: g('jf-perso-nom'),
+      emoji: g('jf-perso-emoji') || '🙂',
+      description: g('jf-perso-desc'),
+    },
+    jauges,
+    scenes: existant ? (existant.scenes || []) : [],
+    sceneDepart: existant ? (existant.sceneDepart || null) : null,
+    createdAt: existant ? existant.createdAt : new Date().toISOString(),
+  };
+
+  const list = mgJeux();
+  const idx = id ? list.findIndex(x => x.id === id) : -1;
+  if (idx >= 0) list[idx] = jeu; else list.push(jeu);
+  save();
+  showToast(id ? '✅ Jeu enregistré' : '🎮 Jeu créé !');
+  navigate('#margot/jeux/' + jeu.id);
+}
+
+function deleteJeu(id) {
+  const j = mgJeu(id);
+  if (!j) return;
+  if (!confirm(`Supprimer définitivement « ${j.titre} » et toutes ses rencontres ?`)) return;
+  state.margot.jeux = mgJeux().filter(x => x.id !== id);
+  save();
+  navigate('#margot/jeux');
+}
+
+// ── Détail d'un jeu : la liste des rencontres ──
+function renderJeuDetail(id) {
+  const jeu = mgJeu(id);
+  const scenes = mgScenes(jeu);
+  const depart = mgSceneDepart(jeu);
+  const p = jeu.personnage || {};
+
+  const sceneCards = scenes.map(sc => {
+    const choix = sc.choix || [];
+    return `
+    <div class="mg-scene${sc.id===depart?' depart':''}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:var(--green-dark)">
+            ${sc.emoji || '🎬'} ${escHtml(sc.titre || 'Sans titre')}
+            ${sc.id===depart?'<span class="mg-badge amber" style="margin-left:6px">Départ</span>':''}
+          </div>
+          ${sc.personnage ? `<div class="mg-muted" style="margin-top:2px">Rencontre : ${escHtml(sc.personnage)}</div>` : ''}
+          ${sc.texte ? `<div class="mg-muted" style="margin-top:6px;white-space:pre-wrap">${escHtml(sc.texte.length>140?sc.texte.slice(0,140)+'…':sc.texte)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="li-btn" title="Modifier" onclick="navigate('#margot/jeux/${jeu.id}/scene/${sc.id}')">✏️</button>
+          <button class="li-btn" title="Supprimer" onclick="deleteScene('${jeu.id}','${sc.id}')">🗑️</button>
+        </div>
+      </div>
+      ${choix.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
+        ${choix.map(c => {
+          const suiv = c.suivantId ? mgScene(jeu, c.suivantId) : null;
+          return `<div style="font-size:.83rem;display:flex;gap:6px;align-items:baseline">
+            <span style="color:var(--green)">🔀</span>
+            <span style="flex:1">${escHtml(c.texte||'(choix sans texte)')}
+              <span class="mg-muted">→ ${suiv ? escHtml(suiv.titre||'Sans titre') : 'Fin de l\'histoire'}</span></span>
+          </div>`;
+        }).join('')}
+      </div>` : `<div class="mg-muted" style="margin-top:8px;font-style:italic">Aucun choix — cette rencontre termine l'histoire.</div>`}
+      ${sc.id!==depart ? `<button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="setSceneDepart('${jeu.id}','${sc.id}')">Définir comme départ</button>` : ''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="mg-card">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:2.4rem;line-height:1">${jeu.emoji || '🎲'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mg-card-title" style="font-size:1.15rem">${escHtml(jeu.titre)}</div>
+          ${jeu.genre ? `<div class="mg-muted">${escHtml(jeu.genre)}</div>` : ''}
+          ${jeu.resume ? `<p style="margin-top:8px;font-size:.9rem;line-height:1.5;white-space:pre-wrap">${escHtml(jeu.resume)}</p>` : ''}
+        </div>
+      </div>
+      ${p.nom || p.description ? `
+      <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:var(--radius-sm)">
+        <div style="font-weight:700;font-size:.9rem">${p.emoji||'🙂'} ${escHtml(p.nom||'Personnage principal')}</div>
+        ${p.description ? `<div class="mg-muted" style="margin-top:4px;white-space:pre-wrap">${escHtml(p.description)}</div>` : ''}
+      </div>` : ''}
+      ${mgJauges(jeu).length ? `<div class="mg-jauges" style="margin-top:12px;margin-bottom:0">
+        ${mgJauges(jeu).map(jg=>`<span class="mg-jauge">${jg.emoji||'📊'} ${escHtml(jg.nom)} : ${jg.depart}</span>`).join('')}
+      </div>` : ''}
+      <div class="flex-gap" style="margin-top:16px">
+        <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/jouer')" ${scenes.length?'':'disabled style="opacity:.5"'}>▶️ Tester</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/modifier')">✏️ Modifier</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteJeu('${jeu.id}')">🗑️ Supprimer</button>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin:20px 0 12px">
+      <h2 style="font-size:1.05rem;color:var(--green-dark)">🎬 Les rencontres</h2>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/scene/nouvelle')">＋ Ajouter</button>
+    </div>
+    ${scenes.length ? sceneCards : `
+      <div class="empty-state">
+        <div class="icon">🎬</div>
+        <p>Aucune rencontre pour l'instant.</p>
+        <p style="font-size:.85rem;margin-top:6px">Une rencontre = une situation, une personne croisée, et les décisions possibles.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/jeux/${jeu.id}/scene/nouvelle')">＋ Créer la première rencontre</button>
+      </div>`}`;
+}
+
+function setSceneDepart(jeuId, sceneId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  jeu.sceneDepart = sceneId;
+  save();
+  showToast('🚩 Scène de départ mise à jour');
+  renderMargotSpace();
+}
+
+function deleteScene(jeuId, sceneId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  const sc = mgScene(jeu, sceneId);
+  if (!sc) return;
+  if (!confirm(`Supprimer la rencontre « ${sc.titre || 'Sans titre'} » ?`)) return;
+  jeu.scenes = mgScenes(jeu).filter(s => s.id !== sceneId);
+  // Les choix qui pointaient vers elle deviennent des fins d'histoire.
+  jeu.scenes.forEach(s => (s.choix||[]).forEach(c => { if (c.suivantId === sceneId) c.suivantId = ''; }));
+  if (jeu.sceneDepart === sceneId) jeu.sceneDepart = null;
+  save();
+  renderMargotSpace();
+}
+
+// ── Formulaire d'une rencontre (scène + choix) ──
+let _sf = {jeuId:null, choix:[]};
+
+function renderSceneForm(jeuId, sceneId) {
+  const jeu = mgJeu(jeuId);
+  const sc = (sceneId && sceneId !== 'nouvelle') ? mgScene(jeu, sceneId) : null;
+  _sf.jeuId = jeuId;
+  _sf.choix = sc ? JSON.parse(JSON.stringify(sc.choix || [])) : [{id:uid(), texte:'', consequence:'', suivantId:'', effets:{}}];
+
+  return `
+    <div class="mg-card">
+      <h2 style="font-size:1.05rem;color:var(--green-dark);margin-bottom:4px">${sc ? 'Modifier la rencontre' : 'Nouvelle rencontre'}</h2>
+      <p class="mg-muted" style="margin-bottom:16px">Une situation, la personne croisée, et les décisions possibles.</p>
+
+      <div class="two-col">
+        <div class="form-group">
+          <label>Titre de la rencontre *</label>
+          <input type="text" id="sc-titre" placeholder="Ex : La vieille dame au marché" value="${escHtml(sc?sc.titre:'')}">
+        </div>
+        <div class="form-group">
+          <label>Emoji</label>
+          <input type="text" id="sc-emoji" maxlength="4" placeholder="🎬" value="${escHtml(sc?(sc.emoji||''):'')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Qui croise-t-on ?</label>
+        <input type="text" id="sc-perso" placeholder="Ex : Une vieille dame les bras chargés" value="${escHtml(sc?(sc.personnage||''):'')}">
+      </div>
+      <div class="form-group">
+        <label>La situation — le texte lu par le joueur *</label>
+        <textarea id="sc-texte" placeholder="Ex : En sortant du marché, tu vois une vieille dame lâcher son sac. Les oranges roulent sur le trottoir. Personne ne s'arrête." style="min-height:110px">${escHtml(sc?(sc.texte||''):'')}</textarea>
+      </div>
+
+      <hr>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap">
+        <h3 style="font-size:.95rem;color:var(--green-dark);margin:0">🔀 Les décisions possibles</h3>
+        <button class="btn btn-outline btn-sm" onclick="mgAddChoix()">＋ Ajouter un choix</button>
+      </div>
+      <p class="mg-muted" style="margin-bottom:10px">Sans aucun choix, la rencontre termine l'histoire.</p>
+      <div id="sc-choix">${mgChoixRows()}</div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-outline" onclick="navigate('#margot/jeux/${jeuId}')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveScene('${jeuId}'${sc?`,'${sc.id}'`:''})">${sc ? 'Enregistrer' : 'Ajouter la rencontre'}</button>
+      </div>
+    </div>`;
+}
+
+function mgChoixRows() {
+  const jeu = mgJeu(_sf.jeuId);
+  if (!_sf.choix.length) return `<p class="mg-muted" style="font-style:italic">Aucun choix : cette rencontre sera une fin d'histoire.</p>`;
+  const autres = mgScenes(jeu).filter(s => s.id !== _margotSceneId);
+  const jauges = mgJauges(jeu);
+
+  return _sf.choix.map((c,i) => `
+    <div class="mg-choice-edit">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:.85rem;color:var(--green-dark)">Choix ${i+1}</strong>
+        <button class="del-btn" onclick="mgRemoveChoix(${i})" title="Supprimer ce choix">×</button>
+      </div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>Ce que le joueur peut faire</label>
+        <input type="text" id="sc-c${i}-texte" placeholder="Ex : Ramasser les oranges avec elle" value="${escHtml(c.texte||'')}">
+      </div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>Ce qui se passe ensuite (optionnel)</label>
+        <textarea id="sc-c${i}-consequence" placeholder="Ex : Elle te remercie longuement et te glisse une adresse dans la main." style="min-height:55px">${escHtml(c.consequence||'')}</textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:${jauges.length?'8px':'0'}">
+        <label>Rencontre suivante</label>
+        <select id="sc-c${i}-suivant">
+          <option value="">🏁 Fin de l'histoire</option>
+          ${autres.map(s => `<option value="${s.id}" ${c.suivantId===s.id?'selected':''}>${escHtml(s.titre||'Sans titre')}</option>`).join('')}
+        </select>
+      </div>
+      ${jauges.length ? `
+      <label style="margin-bottom:4px">Effet sur les jauges</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${jauges.map(jg => `
+          <span style="display:flex;align-items:center;gap:5px;font-size:.82rem">
+            <span>${jg.emoji||'📊'} ${escHtml(jg.nom)}</span>
+            <input type="number" id="sc-c${i}-j-${jg.id}" value="${(c.effets && c.effets[jg.id]) || 0}" style="width:70px;padding:5px 7px">
+          </span>`).join('')}
+      </div>` : ''}
+    </div>`).join('');
+}
+
+function mgSyncChoix() {
+  const jauges = mgJauges(mgJeu(_sf.jeuId));
+  _sf.choix = _sf.choix.map((c,i) => {
+    const effets = {};
+    jauges.forEach(jg => {
+      const v = parseInt(document.getElementById(`sc-c${i}-j-${jg.id}`)?.value, 10);
+      if (v) effets[jg.id] = v;
+    });
+    return {
+      id: c.id || uid(),
+      texte: document.getElementById(`sc-c${i}-texte`)?.value.trim() ?? c.texte,
+      consequence: document.getElementById(`sc-c${i}-consequence`)?.value.trim() ?? c.consequence,
+      suivantId: document.getElementById(`sc-c${i}-suivant`)?.value ?? c.suivantId,
+      effets,
+    };
+  });
+}
+function mgAddChoix() {
+  mgSyncChoix();
+  _sf.choix.push({id:uid(), texte:'', consequence:'', suivantId:'', effets:{}});
+  document.getElementById('sc-choix').innerHTML = mgChoixRows();
+}
+function mgRemoveChoix(i) {
+  mgSyncChoix();
+  _sf.choix.splice(i,1);
+  document.getElementById('sc-choix').innerHTML = mgChoixRows();
+}
+
+function saveScene(jeuId, sceneId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  const g = el => (document.getElementById(el)?.value || '').trim();
+  const titre = g('sc-titre');
+  if (!titre) { alert('Donne un titre à la rencontre.'); document.getElementById('sc-titre')?.focus(); return; }
+  const texte = g('sc-texte');
+  if (!texte) { alert('Décris la situation lue par le joueur.'); document.getElementById('sc-texte')?.focus(); return; }
+  mgSyncChoix();
+
+  const scene = {
+    id: sceneId || uid(),
+    titre,
+    emoji: g('sc-emoji') || '🎬',
+    personnage: g('sc-perso'),
+    texte,
+    choix: _sf.choix.filter(c => c.texte),
+  };
+  if (!jeu.scenes) jeu.scenes = [];
+  const idx = sceneId ? jeu.scenes.findIndex(s => s.id === sceneId) : -1;
+  if (idx >= 0) jeu.scenes[idx] = scene; else jeu.scenes.push(scene);
+  if (!jeu.sceneDepart) jeu.sceneDepart = scene.id;
+  save();
+  showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
+  navigate('#margot/jeux/' + jeuId);
+}
+
+// ── Mode test : jouer la partie ──
+let _play = {jeuId:null, sceneId:null, jauges:{}, consequence:null, suivantId:null, nbChoix:0};
+
+function mgResetPlay(jeu) {
+  _play = {jeuId: jeu.id, sceneId: mgSceneDepart(jeu), jauges:{}, consequence:null, suivantId:null, nbChoix:0};
+  mgJauges(jeu).forEach(jg => { _play.jauges[jg.id] = Number(jg.depart) || 0; });
+}
+
+function renderJeuPlay(jeuId) {
+  const jeu = mgJeu(jeuId);
+  if (_play.jeuId !== jeuId) mgResetPlay(jeu);
+  const p = jeu.personnage || {};
+
+  const jaugesBar = mgJauges(jeu).length ? `<div class="mg-jauges">
+    ${mgJauges(jeu).map(jg => `<span class="mg-jauge">${jg.emoji||'📊'} ${escHtml(jg.nom)} : <strong>${_play.jauges[jg.id] ?? 0}</strong></span>`).join('')}
+  </div>` : '';
+
+  const barre = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:1.6rem">${p.emoji||'🙂'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">${escHtml(p.nom || 'Toi')}</div>
+        <div class="mg-muted">${_play.nbChoix} décision${_play.nbChoix>1?'s':''} prise${_play.nbChoix>1?'s':''}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="mgRejouer('${jeu.id}')">↺ Recommencer</button>
+    </div>
+    ${jaugesBar}`;
+
+  // Écran « conséquence » après une décision
+  if (_play.consequence !== null) {
+    return `${barre}
+      <div class="mg-conseq">${escHtml(_play.consequence)}</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="mgPlayContinue()">Continuer →</button>`;
+  }
+
+  const sc = mgScene(jeu, _play.sceneId);
+  if (!sc) {
+    return `${barre}
+      <div class="empty-state">
+        <div class="icon">🏁</div>
+        <h3 style="color:var(--green-dark)">Fin de l'histoire</h3>
+        <p style="margin-top:6px">${_play.nbChoix} décision${_play.nbChoix>1?'s':''} plus tard, l'aventure s'arrête ici.</p>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="mgRejouer('${jeu.id}')">↺ Rejouer</button>
+      <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="navigate('#margot/jeux/${jeu.id}')">✏️ Revenir à l'éditeur</button>`;
+  }
+
+  const choix = sc.choix || [];
+  return `${barre}
+    <div style="font-weight:700;color:var(--green-dark);margin-bottom:8px">${sc.emoji||'🎬'} ${escHtml(sc.titre||'')}</div>
+    ${sc.personnage ? `<div class="mg-muted" style="margin-bottom:8px">👤 ${escHtml(sc.personnage)}</div>` : ''}
+    <div class="mg-play-text">${escHtml(sc.texte||'')}</div>
+    ${choix.length ? `<div class="mg-muted" style="margin-bottom:8px">Que fais-tu ?</div>
+      ${choix.map((c,i) => `<button class="mg-choice-btn" onclick="mgChoisir(${i})">${escHtml(c.texte)}</button>`).join('')}`
+    : `<div class="mg-muted" style="text-align:center;margin:20px 0">🏁 Aucune décision possible : l'histoire s'arrête ici.</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="mgRejouer('${jeu.id}')">↺ Rejouer</button>`}`;
+}
+
+function mgChoisir(i) {
+  const jeu = mgJeu(_play.jeuId);
+  const sc = mgScene(jeu, _play.sceneId);
+  const c = sc && (sc.choix||[])[i];
+  if (!c) return;
+  Object.entries(c.effets || {}).forEach(([jid, delta]) => {
+    _play.jauges[jid] = (_play.jauges[jid] || 0) + Number(delta || 0);
+  });
+  _play.nbChoix++;
+  _play.suivantId = c.suivantId || null;
+  if (c.consequence) { _play.consequence = c.consequence; }
+  else { _play.sceneId = _play.suivantId; _play.suivantId = null; }
+  renderMargotSpace();
+}
+
+function mgPlayContinue() {
+  _play.consequence = null;
+  _play.sceneId = _play.suivantId;
+  _play.suivantId = null;
+  renderMargotSpace();
+}
+
+function mgRejouer(jeuId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  mgResetPlay(jeu);
+  renderMargotSpace();
 }
 
 // ═══════════════════════════════════════════════════════
