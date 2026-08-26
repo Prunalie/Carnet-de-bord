@@ -185,6 +185,7 @@ body.maison-mode #maison-app{display:block}
 .mg-home-card{display:flex;align-items:flex-start;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;cursor:pointer;transition:.2s}
 .mg-home-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
 .mg-home-icon{font-size:2rem;line-height:1;flex-shrink:0}
+.mg-bible-txt{white-space:pre-wrap;word-break:break-word;font-size:.88rem;line-height:1.65}
 .mg-texte{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:1rem;line-height:1.75;white-space:pre-wrap;word-break:break-word}
 .mg-idee{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:7px;font-size:.92rem}
 .mg-idee.fait{opacity:.55}
@@ -587,6 +588,7 @@ function ensureStateFields() {
     if (!j.scenes) j.scenes = [];
     if (!j.jauges) j.jauges = [];
     if (!j.personnage) j.personnage = {nom:'',emoji:'🙂',description:''};
+    if (!j.bible) j.bible = [];
     j.scenes.forEach(sc => { if (!sc.choix) sc.choix = []; sc.choix.forEach(c => { if (!c.effets) c.effets = {}; }); });
   });
   if (!state.charlot) state.charlot = {prestations:[],pensions:[],cours:[],charges:[]};
@@ -677,7 +679,7 @@ function dispatchHash(hash) {
     _margotTab     = parts[1] || 'home';
     _margotId      = parts[2] || null;
     _margotView    = parts[3] || null;
-    _margotSceneId = parts[4] || null;
+    _margotSubId   = parts[4] || null;
     if (_margotTab === 'aide') _aideTab = parts[2] || 'bases';
     renderMargotSpace();
   }
@@ -944,7 +946,7 @@ function checkPin() {
 let _margotTab     = 'home';
 let _margotId      = null;
 let _margotView    = null;
-let _margotSceneId = null;
+let _margotSubId   = null;
 
 const MG_TABS = [
   {id:'home',      icon:'🏠', label:'Accueil'},
@@ -986,10 +988,22 @@ function renderMargotSpace() {
       title = 'Modifier le jeu'; back = '#margot/jeux/' + jeu.id; showNav = false;
       content = renderJeuForm(jeu.id);
 
+    } else if (jeu && _margotView === 'bible') {
+      showNav = false;
+      if (_margotSubId) {
+        title = _margotSubId === 'nouvelle' ? 'Nouvelle fiche' : 'Modifier la fiche';
+        back = '#margot/jeux/' + jeu.id + '/bible';
+        content = renderBibleForm(jeu.id, _margotSubId);
+      } else {
+        title = 'Bible — ' + (jeu.titre || '');
+        back = '#margot/jeux/' + jeu.id;
+        content = renderJeuBible(jeu.id);
+      }
+
     } else if (jeu && _margotView === 'scene') {
-      title = _margotSceneId === 'nouvelle' ? 'Nouvelle rencontre' : 'Modifier la rencontre';
+      title = _margotSubId === 'nouvelle' ? 'Nouvelle rencontre' : 'Modifier la rencontre';
       back = '#margot/jeux/' + jeu.id; showNav = false;
-      content = renderSceneForm(jeu.id, _margotSceneId);
+      content = renderSceneForm(jeu.id, _margotSubId);
 
     } else if (jeu && _margotView === 'jouer') {
       title = jeu.titre || 'Partie'; back = '#margot/jeux/' + jeu.id; showNav = false;
@@ -1152,6 +1166,7 @@ function renderJeuxListe() {
       <span style="flex:1"><strong>Écrire un jeu de décision</strong><br><span class="mg-muted">Les conseils : tension, jauges, choix qui coûtent</span></span>
       <span style="color:var(--text-muted)">›</span>
     </div>
+    ${mgSeedCarte()}
     ${list.length ? cards : `
       <div class="empty-state">
         <div class="icon">🎲</div>
@@ -1355,6 +1370,7 @@ function renderJeuDetail(id) {
       </div>` : ''}
       <div class="flex-gap" style="margin-top:16px">
         <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/jouer')" ${scenes.length?'':'disabled style="opacity:.5"'}>▶️ Tester</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/bible')">📓 Bible${mgBible(jeu).length?' ('+mgBible(jeu).length+')':''}</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/modifier')">✏️ Modifier</button>
         <button class="btn btn-danger btn-sm" onclick="deleteJeu('${jeu.id}')">🗑️ Supprimer</button>
       </div>
@@ -1447,7 +1463,7 @@ function renderSceneForm(jeuId, sceneId) {
 function mgChoixRows() {
   const jeu = mgJeu(_sf.jeuId);
   if (!_sf.choix.length) return `<p class="mg-muted" style="font-style:italic">Aucun choix : cette rencontre sera une fin d'histoire.</p>`;
-  const autres = mgScenes(jeu).filter(s => s.id !== _margotSceneId);
+  const autres = mgScenes(jeu).filter(s => s.id !== _margotSubId);
   const jauges = mgJauges(jeu);
 
   return _sf.choix.map((c,i) => `
@@ -1536,6 +1552,205 @@ function saveScene(jeuId, sceneId) {
   save();
   showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
   navigate('#margot/jeux/' + jeuId);
+}
+
+// ── Bible du jeu : tout ce qui est décidé sur l'histoire ──
+function mgBible(jeu) {
+  if (!jeu.bible) jeu.bible = [];
+  return jeu.bible;
+}
+function mgBibleSec(jeu, id) { return mgBible(jeu).find(s => s.id === id) || null; }
+
+const MG_BIBLE_MODELE = [
+  {emoji:'🌍', titre:"L'univers",        contenu:"Où et quand ça se passe. Ce qui est différent de chez nous. Ce que tout le monde y trouve normal."},
+  {emoji:'⚖️', titre:'La tension',        contenu:"En une phrase : deux choses désirables qui ne peuvent pas coexister.\n\nMes deux jauges :"},
+  {emoji:'🙋', titre:'Les personnages',   contenu:"Le personnage principal — son désir, sa peur, son défaut.\n\nLes autres :"},
+  {emoji:'🗺️', titre:'Le décor',          contenu:"Les lieux où l'on passe. Les règles du monde qu'il faut connaître pour comprendre les choix."},
+  {emoji:'🗓️', titre:'La structure',      contenu:"Rencontre 1 :\nRencontre 2 :\nRencontre 3 :\nRencontre 4 :\nRencontre 5 :"},
+  {emoji:'🎬', titre:'Les fins',          contenu:"Fin A :\nFin B :"},
+  {emoji:'❓', titre:'À décider',          contenu:"Ce qui n'est pas encore tranché."},
+];
+
+function renderJeuBible(jeuId) {
+  const jeu = mgJeu(jeuId);
+  const secs = mgBible(jeu);
+
+  const fiches = secs.map((s, i) => `
+    <details class="mg-guide">
+      <summary><span class="mg-guide-num" style="background:var(--amber);color:var(--green-dark)">${s.emoji || '📄'}</span>${escHtml(s.titre)}</summary>
+      <div class="mg-guide-body">
+        <div class="mg-bible-txt">${escHtml(s.contenu || '')}</div>
+        <div class="flex-gap" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeuId}/bible/${s.id}')">✏️ Modifier</button>
+          <button class="li-btn" onclick="moveBibleSec('${jeuId}','${s.id}',-1)" title="Monter" ${i===0?'disabled style="opacity:.3"':''}>↑</button>
+          <button class="li-btn" onclick="moveBibleSec('${jeuId}','${s.id}',1)" title="Descendre" ${i===secs.length-1?'disabled style="opacity:.3"':''}>↓</button>
+          <button class="li-btn" onclick="deleteBibleSec('${jeuId}','${s.id}')" title="Supprimer">🗑️</button>
+        </div>
+      </div>
+    </details>`).join('');
+
+  return `
+    <div class="mg-card" style="background:var(--green-dark);color:#fff;border:none">
+      <div style="font-size:1.6rem;margin-bottom:6px">📓</div>
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">La bible de ${escHtml(jeu.titre)}</div>
+      <p style="font-size:.88rem;line-height:1.5;opacity:.9">Tout ce qui est décidé sur l'histoire : l'univers, les personnages, l'intrigue. C'est ici qu'on revient quand on ne sait plus.</p>
+    </div>
+    <div class="section-header" style="margin-bottom:12px">
+      <h2 style="font-size:1.05rem;color:var(--green-dark)">${secs.length} fiche${secs.length>1?'s':''}</h2>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeuId}/bible/nouvelle')">＋ Ajouter</button>
+    </div>
+    ${secs.length ? fiches : `
+      <div class="empty-state">
+        <div class="icon">📓</div>
+        <p>La bible est vide.</p>
+        <p style="font-size:.85rem;margin-top:6px">Note ici tout ce que tu décides sur ton histoire, pour ne pas te contredire trois rencontres plus loin.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="insererModeleBible('${jeuId}')">📋 Partir du plan type</button>
+        <button class="btn btn-outline" style="margin-top:8px" onclick="navigate('#margot/jeux/${jeuId}/bible/nouvelle')">＋ Fiche vierge</button>
+      </div>`}`;
+}
+
+function insererModeleBible(jeuId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  MG_BIBLE_MODELE.forEach(m => mgBible(jeu).push({id:uid(), emoji:m.emoji, titre:m.titre, contenu:m.contenu}));
+  save();
+  showToast('📋 Plan type inséré');
+  renderMargotSpace();
+}
+
+function renderBibleForm(jeuId, secId) {
+  const jeu = mgJeu(jeuId);
+  const s = (secId && secId !== 'nouvelle') ? mgBibleSec(jeu, secId) : null;
+  return `
+    <div class="mg-card">
+      <div class="two-col">
+        <div class="form-group">
+          <label>Titre de la fiche *</label>
+          <input type="text" id="bb-titre" placeholder="Ex : Les personnages" value="${escHtml(s?s.titre:'')}">
+        </div>
+        <div class="form-group">
+          <label>Emoji</label>
+          <input type="text" id="bb-emoji" maxlength="4" placeholder="📄" value="${escHtml(s?(s.emoji||''):'')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Contenu</label>
+        <textarea id="bb-contenu" placeholder="Écris ici tout ce qui est décidé." style="min-height:320px;line-height:1.6">${escHtml(s?(s.contenu||''):'')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="navigate('#margot/jeux/${jeuId}/bible')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveBibleSec('${jeuId}'${s?`,'${s.id}'`:''})">Enregistrer</button>
+      </div>
+    </div>`;
+}
+
+function saveBibleSec(jeuId, secId) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  const titre = (document.getElementById('bb-titre')?.value || '').trim();
+  if (!titre) { alert('Donne un titre à la fiche.'); document.getElementById('bb-titre')?.focus(); return; }
+  const sec = {
+    id: secId || uid(),
+    titre,
+    emoji: (document.getElementById('bb-emoji')?.value || '').trim() || '📄',
+    contenu: document.getElementById('bb-contenu')?.value || '',
+  };
+  const list = mgBible(jeu);
+  const idx = secId ? list.findIndex(x => x.id === secId) : -1;
+  if (idx >= 0) list[idx] = sec; else list.push(sec);
+  save();
+  showToast('✅ Fiche enregistrée');
+  navigate('#margot/jeux/' + jeuId + '/bible');
+}
+
+function deleteBibleSec(jeuId, secId) {
+  const jeu = mgJeu(jeuId);
+  const s = jeu && mgBibleSec(jeu, secId);
+  if (!s) return;
+  if (!confirm(`Supprimer la fiche « ${s.titre} » ?`)) return;
+  jeu.bible = mgBible(jeu).filter(x => x.id !== secId);
+  save();
+  renderMargotSpace();
+}
+
+function moveBibleSec(jeuId, secId, delta) {
+  const jeu = mgJeu(jeuId);
+  if (!jeu) return;
+  const list = mgBible(jeu);
+  const i = list.findIndex(x => x.id === secId);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  save();
+  renderMargotSpace();
+}
+
+// ── Brouillon partagé : le jeu qu'on construit ensemble ──
+const MG_SEED_ID = 'seed-academies';
+
+function creerJeuAcademies() {
+  if (mgJeu(MG_SEED_ID)) { navigate('#margot/jeux/' + MG_SEED_ID); return; }
+  const b = (emoji, titre, contenu) => ({id:uid(), emoji, titre, contenu});
+  mgJeux().push({
+    id: MG_SEED_ID,
+    titre: 'Académies',
+    emoji: '🛰️',
+    genre: 'Sport futuriste · enquête · romance',
+    resume: "Une compétition d'esport entre académies. Elle est Vigie : son travail est de voir ce que les autres n'ont pas le temps de voir. C'est pour ça qu'elle sera la seule à remarquer que quelqu'un triche.",
+    personnage: {
+      nom: '(à nommer)',
+      emoji: '👁️',
+      description: "Vigie de l'académie Sablon, première année de titularisation. Recrutée pour son œil, pas pour sa vitesse.\n\nDésir : que Sablon reste debout — la section ferme si l'équipe ne fait rien cette saison.\nPeur : se tromper publiquement, et détruire quelqu'un pour rien.\nDéfaut (à valider) : elle voit tout et ne dit rien. Elle attend d'être sûre — et pendant qu'elle attend, le mensonge grandit.",
+    },
+    jauges: [
+      {id:'jg-verite',  emoji:'🔎', nom:'Vérité',  depart:10},
+      {id:'jg-loyaute', emoji:'🛡️', nom:'Loyauté', depart:10},
+    ],
+    scenes: [],
+    sceneDepart: null,
+    createdAt: new Date().toISOString(),
+    bible: [
+      b('⚖️', 'La tension (la boussole)',
+"LA PHRASE :\nJusqu'où on protège quelqu'un qu'on aime avant de trahir ce qui est vrai ?\n\nDire la vérité CONTRE garder quelqu'un.\n\nLES DEUX JAUGES :\n🔎 Vérité — ce qu'elle sait, ce qu'elle ose dire, ce qu'elle prouve.\n🛡️ Loyauté — sa place dans l'équipe, la confiance des autres, le lien avec lui.\n\nChaque décision doit faire monter l'une et descendre l'autre. Si un choix ne coûte rien, ce n'est pas un choix.\n\n(Une troisième jauge 📈 Classement est tentante — l'avancée dans le tournoi. À garder pour la version 2 : deux jauges suffisent à faire mal.)"),
+
+      b('🌍', "L'univers",
+"Fin du XXIe siècle. Les villes se sont reconstruites autour de campus géants, et le sport s'est déplacé : plus de contact, des disciplines augmentées.\n\nLE LIEN\nTous les joueurs licenciés portent un lien neuronal — un implant léger à la base de la nuque. Il ne rend pas plus fort : il rend plus TÔT. Un joueur lié perçoit l'arène en 40 ms au lieu de 200.\nConséquence : les matchs vont trop vite pour l'œil nu. On les regarde ralentis, commentés, décortiqués — et il faut quelqu'un dans l'équipe dont le seul travail est de regarder.\n\nLE STATUT\nLes académies sont de vraies écoles — cours le matin, entraînement l'après-midi. Mais leur réputation, leurs financements et leur survie tiennent à leur équipe. Un titre national, c'est dix ans de budget.\nÊtre titulaire change ton statut social du jour au lendemain. Tout le monde regarde. Tout le monde a un avis sur toi. (L'effet Quidditch.)"),
+
+      b('🏆', 'Le sport — VERTEX',
+"NOM À VALIDER : Vertex. Alternatives : Orbe · Sillage · Zénith · Faille.\n\nLE BUT\nDeux équipes, deux moitiés d'arène. Au centre de chaque camp, un NOYAU : une sphère de lumière ancrée au sol. Gagner, c'est arracher le Noyau adverse et le ramener chez soi.\n\nLA RÈGLE QUI CHANGE TOUT — L'EMPRISE\nOn ne peut pas simplement foncer. L'arène est un quadrillage de dalles qui passent à ta couleur quand ton équipe les contrôle. Le Noyau adverse ne se décroche que si ton équipe tient 60 % d'Emprise pendant dix secondes.\n\nPourquoi c'est important pour l'histoire :\n— Voler le Noyau n'est jamais un exploit individuel, c'est la récompense d'un travail collectif. Donc la gloire du Faucheur est toujours un peu volée aux autres.\n— Tout est mesuré, dalle par dalle. Donc tout laisse une trace. Donc on peut enquêter.\n\nFORMAT : 3 manches gagnantes, une manche dure de 4 à 12 minutes."),
+
+      b('👥', 'Les 7 postes',
+"ÉQUIPE DE 7 (recommandation) — impair, donc pas d'égalité dans un vote d'équipe ; assez pour 7 personnalités distinctes ; et c'est le nombre du Quidditch, ça sonne juste. 6 serait plus serré, 10 rendrait la moitié des personnages invisibles.\n\n1. STRATÈGE — le cerveau. Appelle les mouvements en direct. Souvent le capitaine.\n2. POINTE — ouvre le terrain, prend les dalles. Le poste le plus exposé physiquement.\n3. MUR — tient la ligne, empêche l'Emprise adverse de monter.\n4. ANCRE — garde le Noyau. Ne quitte jamais son camp. Poste ingrat, solitaire, jamais filmé.\n5. FAUCHEUR — celui qui arrache le Noyau. La star. Celui qu'on met sur les affiches.\n6. RELAIS — soutient, repositionne, répare les liens en cours de match. (Le seul qui touche au matériel des autres : suspect idéal.)\n7. VIGIE — perchée, elle ne joue presque pas. Elle lit l'arène et prévient une seconde avant tout le monde.\n\nDans les académies, on est réparti par poste dès la première année, et les groupes ne se mélangent pas. Les Vigies s'entraînent avec les Vigies. C'est pour ça qu'on peut passer trois ans dans la même école sans jamais avoir parlé à son Faucheur."),
+
+      b('🎓', 'Les quatre académies',
+"SABLON — la sienne. Autrefois prestigieuse, effondrée après un scandale il y a six ans. Elle remonte lentement. Cette saison est celle de la dernière chance : sans résultat, la section ferme et tout le monde est dispersé.\n(À décider ensemble : c'était quoi, le scandale d'il y a six ans ? Et qu'est-ce qu'il a à voir avec aujourd'hui ?)\n\nHALCYON — la favorite. Riche, sponsorisée, invaincue depuis quatre ans. Ses joueurs signent des contrats professionnels à 16 ans. Tout le monde les soupçonne de tricher, ce qui est très pratique pour ceux qui trichent vraiment.\n\nKESTREL — les techniciens. Un jeu lent, mathématique, insupportable à regarder, redoutable à jouer. Ils gagnent des matchs à 2 % d'Emprise près.\n\nORIA — les gamins. Une académie qui n'existe que depuis trois ans, pleine de joueurs de quinze ans qui n'ont peur de rien parce qu'ils n'ont rien à perdre."),
+
+      b('🙋', 'Elle et lui',
+"ELLE — VIGIE\nSon poste EST son pouvoir d'enquêtrice : elle passe ses journées à regarder des rediffusions au ralenti et à repérer des motifs. Personne d'autre dans l'histoire n'a cette compétence. C'est ce qui rend crédible qu'elle, et elle seule, remarque l'anomalie.\nDéfaut retenu (à valider) : elle ne dit rien tant qu'elle n'est pas sûre. Elle croit que c'est de la rigueur ; c'est de la peur. Et pendant qu'elle attend d'être sûre, le mensonge grandit et l'entraîne dedans.\n\nLUI — FAUCHEUR\nLa star de Sablon, celui sur qui l'académie a tout misé. Réputé arrogant et distant ; en réalité terrorisé.\nPourquoi le Faucheur, et pas un autre poste : quand les soupçons tomberont, ils tomberont sur lui. L'enquête menace directement l'histoire d'amour. C'est ce qui rend le dilemme réel au lieu d'être théorique.\n\nLEUR RENCONTRE\nIls sont dans la même académie depuis des années et ne se sont jamais parlé — postes séparés, groupes séparés. Ils se rencontrent le jour où l'équipe est composée, au premier tour du tournoi. Elle sait tout de lui par les vidéos qu'elle a analysées. Il ne sait pas qu'elle existe.\n\nLES CINQ AUTRES\nStratège (capitaine, dernière année, sous une pression énorme) · Ancre (solitaire, le seul qui reste au camp — donc le seul témoin possible) · Mur · Pointe · Relais (touche au matériel de tout le monde : le suspect parfait, donc probablement innocent).\n\nLES ADULTES\nL'entraîneuse de Sablon — ambiguë, elle aime ses joueurs et elle veut sauver sa section. Le proviseur. Le sponsor de Halcyon."),
+
+      b('🔎', "L'enquête — le décalage",
+"LA TRICHE\nDans Vertex, on ne peut pas être plus fort. Mais on peut être plus tôt. Le décalage consiste à livrer à un joueur les positions adverses environ 200 ms avant tout le monde.\nInvisible à l'œil nu. Invisible dans les statistiques classiques. Visible uniquement pour quelqu'un qui regarde COMMENT un joueur bouge : il part avant que l'information existe.\n\nLES TROIS PALIERS DE L'ENQUÊTE\n\n1. LA FAUSSE PISTE — Halcyon.\nTrop parfaits, trop riches : tout le monde les soupçonne, elle aussi. Elle trouve effectivement quelque chose chez eux — mais c'est mineur (ils achètent des informations sur les adversaires ; c'est déloyal, ce n'est pas du décalage). La vraie fonction de cette piste : lui donner raison une première fois, pour qu'elle se croie infaillible juste avant de se tromper.\n\n2. LA BASCULE — lui.\nLes mêmes courbes apparaissent chez son propre Faucheur. Il part trop tôt. Systématiquement. Depuis le début de la saison.\n\n3. LA VÉRITÉ — l'académie.\nCe n'est pas lui qui triche : on triche SUR lui. Son lien a été « ajusté » par l'académie pour fabriquer une star, sauver la section et ramener les financements.\nMais il l'a compris il y a des mois. Et il n'a rien dit — sa bourse, sa famille, sa place en dépendent. Il est victime ET complice.\n\nPOURQUOI CETTE VERSION\n— Le coupable n'est pas un méchant, c'est une institution qui se noie. Plus dérangeant, plus vrai.\n— Il reste aimable tout en étant réellement en tort : pas de fausse innocence, pas de monstre.\n— Elle se retrouve devant un choix sans bonne réponse. C'est exactement la tension de départ.\n\nÀ DÉCIDER : est-ce qu'il sait depuis le début ? (Je recommande oui — c'est son secret, et ça donne un sous-texte à toutes leurs scènes.)"),
+
+      b('🗓️', 'Le tournoi = la structure',
+"Le tournoi dure cinq jours. Cinq jours = cinq rencontres pour la première version du jeu. Chaque journée se termine sur une décision qui coûte.\n\nJ1 — LE TIRAGE\nL'équipe est composée pour la première fois de l'année. Elle et lui se rencontrent.\nDécision : elle a repéré un défaut dans le jeu d'un coéquipier. Elle le dit devant tout le monde, ou elle se tait.\n\nJ2 — LES POULES\nPremier match. Elle voit l'anomalie sans encore comprendre ce que c'est.\nDécision : en parler au capitaine, ou vérifier seule d'abord.\n\nJ3 — LES QUARTS\nLa piste Halcyon. Elle a raison sur quelque chose — et tort sur l'essentiel.\nDécision : dénoncer Halcyon publiquement avec une preuve incomplète, ou continuer à chercher.\n\nJ4 — LA DEMIE\nLes données pointent vers son propre camp. Vers lui.\nDécision : le confronter seule, prévenir l'entraîneuse, ou effacer ce qu'elle a trouvé.\n\nJ5 — LA FINALE\nParler, se taire, ou le forcer à parler lui-même.\n\nLES TROIS FINS\nA — Elle parle. Sablon ferme, il est banni. Elle avait raison et elle a tout perdu.\nB — Elle se tait. Ils gagnent. Elle sait, pour toujours.\nC — Elle le force à se dénoncer lui-même. La plus difficile à écrire, la plus belle : elle ne le sauve pas, elle lui rend le choix."),
+
+      b('❓', 'À décider ensemble',
+"1. Le nom du sport : Vertex, Orbe, Sillage, Zénith — ou autre chose ?\n2. Son prénom à elle, son prénom à lui.\n3. Le nom des académies te va ? (Sablon, Halcyon, Kestrel, Oria)\n4. 6, 7 ou 10 joueurs par équipe — je recommande 7.\n5. Le scandale de Sablon il y a six ans : c'était quoi ? Est-ce que c'est la première fois que l'académie triche, ou est-ce que ça recommence ?\n6. Son défaut à elle : elle se tait trop longtemps, ou elle accuse trop vite ? (Je recommande : elle se tait.)\n7. Est-ce qu'il sait, dès le début, que son lien est truqué ?\n8. Vers quelle fin on écrit en priorité ?"),
+    ],
+  });
+  save();
+  showToast('🛰️ Bible créée');
+  navigate('#margot/jeux/' + MG_SEED_ID + '/bible');
+}
+
+function mgSeedCarte() {
+  if (mgJeu(MG_SEED_ID)) return '';
+  return `
+    <div class="mg-guide-cta" style="background:var(--green-light);border-color:var(--green)" onclick="creerJeuAcademies()">
+      <span style="font-size:1.3rem">🛰️</span>
+      <span style="flex:1"><strong>Académies — notre brouillon</strong><br><span class="mg-muted">La compétition d'esport : univers, postes, enquête, structure</span></span>
+      <span style="color:var(--text-muted)">›</span>
+    </div>`;
 }
 
 // ── Mode test : jouer la partie ──
