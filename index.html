@@ -774,6 +774,14 @@ const NAV_TABS = [
   {id:'notes',     icon:'📝', label:'Notes'},
   {id:'profiles',  icon:'👤', label:'Profils'},
 ];
+// ⚠️ À METTRE À JOUR à chaque envoi dans main : date affichée en bas du portail.
+const LAST_UPDATE = '2026-08-17';
+function fmtLongDateFr(iso) {
+  const d = new Date(iso + 'T00:00:00');   // heure locale, sinon décalage d'un jour
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+}
+
 function showPortal() { navigate('#'); }
 function enterFamille(tab) { navigate('#famille/' + (tab || 'home')); }
 function showMaison() { navigate('#maison'); }
@@ -824,6 +832,9 @@ function renderPortal() {
         <div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Espace personnel</div>
         <div class="pc-badge">🔒 Accès privé</div>
       </div>
+    </div>
+    <div style="text-align:center;padding:4px 24px 28px;font-size:.78rem;color:var(--text-muted)">
+      Dernière mise à jour : ${fmtLongDateFr(LAST_UPDATE)}
     </div>`;
 }
 
