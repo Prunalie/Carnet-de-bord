@@ -186,6 +186,8 @@ body.maison-mode #maison-app{display:block}
 .mg-home-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
 .mg-home-icon{font-size:2rem;line-height:1;flex-shrink:0}
 .mg-tension{background:var(--amber-light);border-left:3px solid var(--amber);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:11px 13px;margin-top:14px;font-size:.88rem;line-height:1.55;white-space:pre-wrap}
+.mg-bloc{background:var(--bg);border-radius:var(--radius-sm);padding:11px 13px;margin-top:10px;font-size:.86rem;line-height:1.55;white-space:pre-wrap}
+.mg-bloc strong{color:var(--green-dark)}
 .mg-perso-ligne{display:flex;gap:8px;align-items:baseline;margin-top:7px;font-size:.85rem;line-height:1.5}
 .mg-perso-ligne strong{color:var(--green-dark)}
 .mg-bible-txt{white-space:pre-wrap;word-break:break-word;font-size:.88rem;line-height:1.65}
@@ -1214,6 +1216,14 @@ function renderJeuForm(id) {
         <textarea id="jf-tension" placeholder="Deux choses désirables qui ne peuvent pas coexister dans ton histoire." style="min-height:60px">${escHtml(j?(j.tension||''):'')}</textarea>
         <div class="mg-muted" style="margin-top:4px">C'est ta boussole : tu y reviendras chaque fois que tu hésiteras sur un choix.</div>
       </div>
+      <div class="form-group">
+        <label>📜 Les règles du monde</label>
+        <textarea id="jf-regles" placeholder="Ce qu'il faut savoir pour comprendre les choix : ce qui est permis, ce qui est interdit, ce que ça coûte de transgresser." style="min-height:70px">${escHtml(j?(j.regles||''):'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>🎭 Ce qui s'oppose</label>
+        <textarea id="jf-antagoniste" placeholder="Une personne, une institution, un système, une part d'elle-même. Et ce que cet adversaire a de légitime." style="min-height:70px">${escHtml(j?(j.antagoniste||''):'')}</textarea>
+      </div>
 
       <hr>
       <h3 style="font-size:.95rem;color:var(--green-dark);margin-bottom:10px">🙂 Le personnage principal</h3>
@@ -1304,6 +1314,8 @@ function saveJeu(id) {
     genre: g('jf-genre'),
     resume: g('jf-resume'),
     tension: g('jf-tension'),
+    regles: g('jf-regles'),
+    antagoniste: g('jf-antagoniste'),
     personnage: {
       nom: g('jf-perso-nom'),
       emoji: g('jf-perso-emoji') || '🙂',
@@ -1385,6 +1397,8 @@ function renderJeuDetail(id) {
         </div>
       </div>
       ${jeu.tension ? `<div class="mg-tension"><strong>⚖️ La tension</strong><br>${escHtml(jeu.tension)}</div>` : ''}
+      ${[['📜','Les règles du monde',jeu.regles],['🎭',"Ce qui s'oppose",jeu.antagoniste]].filter(x=>x[2]).map(([ic,lb,tx]) =>
+        `<div class="mg-bloc"><strong>${ic} ${lb}</strong><br>${escHtml(tx)}</div>`).join('')}
       ${p.nom || p.description || p.veut || p.craint || p.defaut ? `
       <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:var(--radius-sm)">
         <div style="font-weight:700;font-size:.9rem">${p.emoji||'🙂'} ${escHtml(p.nom||'Personnage principal')}</div>
