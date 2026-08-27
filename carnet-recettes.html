@@ -186,6 +186,8 @@ body.maison-mode #maison-app{display:block}
 .mg-home-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
 .mg-home-icon{font-size:2rem;line-height:1;flex-shrink:0}
 .mg-tension{background:var(--amber-light);border-left:3px solid var(--amber);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:11px 13px;margin-top:14px;font-size:.88rem;line-height:1.55;white-space:pre-wrap}
+.mg-cond{display:inline-block;background:var(--amber-light);color:#8a6520;border-radius:20px;padding:1px 8px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.mg-cond.pose{background:var(--green-light);color:var(--green-dark)}
 .mg-chapitre{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:18px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--green-light)}
 .mg-chapitre:first-child{margin-top:0}
 .mg-chapitre span{background:var(--green-light);color:var(--green-dark);border-radius:20px;padding:1px 9px;font-size:.72rem;letter-spacing:0}
@@ -597,7 +599,12 @@ function ensureStateFields() {
     if (!j.jauges) j.jauges = [];
     if (!j.personnage) j.personnage = {nom:'',emoji:'🙂',description:''};
     if (!j.bible) j.bible = [];
-    j.scenes.forEach(sc => { if (!sc.choix) sc.choix = []; sc.choix.forEach(c => { if (!c.effets) c.effets = {}; }); });
+    if (!j.marqueurs) j.marqueurs = [];
+    j.scenes.forEach(sc => { if (!sc.choix) sc.choix = []; sc.choix.forEach(c => {
+      if (!c.effets) c.effets = {};
+      if (!c.marques) c.marques = [];
+      if (c.condition === undefined) c.condition = null;
+    }); });
   });
   if (!state.charlot) state.charlot = {prestations:[],pensions:[],cours:[],charges:[]};
   if (state.charlot.contrats && !state.charlot.prestations) { state.charlot.prestations = state.charlot.contrats; delete state.charlot.contrats; }
@@ -1136,6 +1143,8 @@ function mgJeu(id)          { return mgJeux().find(j => j.id === id) || null; }
 function mgScenes(jeu)      { return (jeu && jeu.scenes) || []; }
 function mgScene(jeu, id)   { return mgScenes(jeu).find(s => s.id === id) || null; }
 function mgJauges(jeu)      { return (jeu && jeu.jauges) || []; }
+function mgMarqueurs(jeu)   { return (jeu && jeu.marqueurs) || []; }
+function mgMarqueur(jeu, id){ return mgMarqueurs(jeu).find(m => m.id === id) || null; }
 function mgSceneDepart(jeu) {
   if (jeu.sceneDepart && mgScene(jeu, jeu.sceneDepart)) return jeu.sceneDepart;
   return mgScenes(jeu)[0] ? mgScenes(jeu)[0].id : null;
@@ -1185,11 +1194,12 @@ function renderJeuxListe() {
 }
 
 // ── Formulaire de création / modification d'un jeu ──
-let _jf = {jauges: []};
+let _jf = {jauges: [], marqueurs: []};
 
 function renderJeuForm(id) {
   const j = id ? mgJeu(id) : null;
   _jf.jauges = j ? JSON.parse(JSON.stringify(mgJauges(j))) : [];
+  _jf.marqueurs = j ? JSON.parse(JSON.stringify(mgMarqueurs(j))) : [];
   const p = (j && j.personnage) || {};
   return `
     <div class="mg-card">
@@ -1265,6 +1275,14 @@ function renderJeuForm(id) {
       <p class="mg-muted" style="margin-bottom:10px">Ce qui monte ou descend selon les décisions : humeur, argent, confiance…</p>
       <div id="jf-jauges">${mgJaugeRows()}</div>
 
+      <hr>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap">
+        <h3 style="font-size:.95rem;color:var(--green-dark);margin:0">🔖 Les marqueurs (optionnel)</h3>
+        <button class="btn btn-outline btn-sm" onclick="mgAddMarqueur()">＋ Ajouter un marqueur</button>
+      </div>
+      <p class="mg-muted" style="margin-bottom:10px">Ce dont l'histoire se souvient : un objet emporté, une promesse faite, une porte ouverte. Un choix pose un marqueur, et un choix bien plus tard peut n'exister que grâce à lui.</p>
+      <div id="jf-marqueurs">${mgMarqueurRows()}</div>
+
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
         <button class="btn btn-outline" onclick="navigate('${j ? '#margot/jeux/'+j.id : '#margot/jeux'}')">Annuler</button>
         <button class="btn btn-primary" onclick="saveJeu(${j ? `'${j.id}'` : ''})">${j ? 'Enregistrer' : 'Créer le jeu'}</button>
@@ -1281,6 +1299,33 @@ function mgJaugeRows() {
       <input type="number" id="jf-j${i}-depart" placeholder="Départ" value="${jg.depart===undefined?10:jg.depart}">
       <button class="del-btn" onclick="mgRemoveJauge(${i})" title="Supprimer">×</button>
     </div>`).join('');
+}
+
+function mgMarqueurRows() {
+  if (!_jf.marqueurs.length) return `<p class="mg-muted" style="font-style:italic">Aucun marqueur — l'histoire ne gardera pas trace des objets ni des promesses.</p>`;
+  return _jf.marqueurs.map((mk,i) => `
+    <div class="mg-choice-edit" style="display:grid;grid-template-columns:60px 1fr 34px;gap:6px;align-items:center;padding:8px">
+      <input type="text" id="jf-m${i}-emoji" maxlength="4" placeholder="🔖" value="${escHtml(mk.emoji||'')}">
+      <input type="text" id="jf-m${i}-nom" placeholder="Ex : a emporté le casque" value="${escHtml(mk.nom||'')}">
+      <button class="del-btn" onclick="mgRemoveMarqueur(${i})" title="Supprimer">×</button>
+    </div>`).join('');
+}
+function mgSyncMarqueurs() {
+  _jf.marqueurs = _jf.marqueurs.map((mk,i) => ({
+    id: mk.id,
+    emoji: document.getElementById(`jf-m${i}-emoji`)?.value.trim() ?? mk.emoji,
+    nom:   document.getElementById(`jf-m${i}-nom`)?.value.trim() ?? mk.nom,
+  }));
+}
+function mgAddMarqueur() {
+  mgSyncMarqueurs();
+  _jf.marqueurs.push({id:uid(), emoji:'🔖', nom:''});
+  document.getElementById('jf-marqueurs').innerHTML = mgMarqueurRows();
+}
+function mgRemoveMarqueur(i) {
+  mgSyncMarqueurs();
+  _jf.marqueurs.splice(i,1);
+  document.getElementById('jf-marqueurs').innerHTML = mgMarqueurRows();
 }
 
 function mgSyncJauges() {
@@ -1307,7 +1352,9 @@ function saveJeu(id) {
   const titre = g('jf-titre');
   if (!titre) { alert('Donne un titre à ton jeu.'); document.getElementById('jf-titre')?.focus(); return; }
   mgSyncJauges();
+  mgSyncMarqueurs();
   const jauges = _jf.jauges.filter(jg => jg.nom);
+  const marqueurs = _jf.marqueurs.filter(mk => mk.nom);
 
   const existant = id ? mgJeu(id) : null;
   const jeu = {
@@ -1328,6 +1375,7 @@ function saveJeu(id) {
       defaut: g('jf-perso-defaut'),
     },
     jauges,
+    marqueurs,
     scenes: existant ? (existant.scenes || []) : [],
     sceneDepart: existant ? (existant.sceneDepart || null) : null,
     createdAt: existant ? existant.createdAt : new Date().toISOString(),
@@ -1372,9 +1420,12 @@ function mgSceneCarte(jeu, sc, depart) {
       ${choix.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
         ${choix.map(c => {
           const suiv = c.suivantId ? mgScene(jeu, c.suivantId) : null;
+          const cond = c.condition && c.condition.id ? mgMarqueur(jeu, c.condition.id) : null;
+          const poses = (c.marques||[]).map(mid => mgMarqueur(jeu, mid)).filter(Boolean);
           return `<div style="font-size:.83rem;display:flex;gap:6px;align-items:baseline">
             <span style="color:var(--green)">🔀</span>
-            <span style="flex:1">${escHtml(c.texte||'(choix sans texte)')}
+            <span style="flex:1">${cond ? `<span class="mg-cond">${c.condition.etat==='absent'?'✕':'✓'} ${escHtml(cond.nom)}</span> ` : ''}${escHtml(c.texte||'(choix sans texte)')}
+              ${poses.length ? poses.map(m=>`<span class="mg-cond pose">🔖 ${escHtml(m.nom)}</span>`).join(' ') : ''}
               <span class="mg-muted">→ ${suiv ? escHtml(suiv.titre||'Sans titre') : 'Fin de l\'histoire'}</span></span>
           </div>`;
         }).join('')}
@@ -1438,8 +1489,9 @@ function renderJeuDetail(id) {
         ${[['🎯','Veut',p.veut],['😨','Craint',p.craint],['⚡','Défaut',p.defaut]].filter(x=>x[2]).map(([ic,lb,tx]) =>
           `<div class="mg-perso-ligne"><span>${ic}</span><span><strong>${lb}</strong> — ${escHtml(tx)}</span></div>`).join('')}
       </div>` : ''}
-      ${mgJauges(jeu).length ? `<div class="mg-jauges" style="margin-top:12px;margin-bottom:0">
+      ${mgJauges(jeu).length || mgMarqueurs(jeu).length ? `<div class="mg-jauges" style="margin-top:12px;margin-bottom:0">
         ${mgJauges(jeu).map(jg=>`<span class="mg-jauge">${jg.emoji||'📊'} ${escHtml(jg.nom)} : ${jg.depart}</span>`).join('')}
+        ${mgMarqueurs(jeu).map(mk=>`<span class="mg-jauge" style="background:var(--amber-light);border-color:var(--amber)">${mk.emoji||'🔖'} ${escHtml(mk.nom)}</span>`).join('')}
       </div>` : ''}
       <div class="flex-gap" style="margin-top:16px">
         <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/jouer')" ${scenes.length?'':'disabled style="opacity:.5"'}>▶️ Tester</button>
@@ -1499,7 +1551,7 @@ function renderSceneForm(jeuId, sceneId) {
   const sc = (sceneId && sceneId !== 'nouvelle') ? mgScene(jeu, sceneId) : null;
   const parent = (!sc && _mgEnchainerDe) ? mgScene(jeu, _mgEnchainerDe) : null;
   _sf.jeuId = jeuId;
-  _sf.choix = sc ? JSON.parse(JSON.stringify(sc.choix || [])) : [{id:uid(), texte:'', consequence:'', suivantId:'', effets:{}}];
+  _sf.choix = sc ? JSON.parse(JSON.stringify(sc.choix || [])) : [{id:uid(), texte:'', consequence:'', suivantId:'', effets:{}, marques:[], condition:null}];
 
   return `
     <div class="mg-card">
@@ -1552,6 +1604,7 @@ function mgChoixRows() {
   if (!_sf.choix.length) return `<p class="mg-muted" style="font-style:italic">Aucun choix : cette rencontre sera une fin d'histoire.</p>`;
   const autres = mgScenes(jeu).filter(s => s.id !== _margotSubId);
   const jauges = mgJauges(jeu);
+  const marqueurs = mgMarqueurs(jeu);
 
   return _sf.choix.map((c,i) => `
     <div class="mg-choice-edit">
@@ -1576,36 +1629,63 @@ function mgChoixRows() {
       </div>
       ${jauges.length ? `
       <label style="margin-bottom:4px">Effet sur les jauges</label>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:${marqueurs.length?'12px':'0'}">
         ${jauges.map(jg => `
           <span style="display:flex;align-items:center;gap:5px;font-size:.82rem">
             <span>${jg.emoji||'📊'} ${escHtml(jg.nom)}</span>
             <input type="number" id="sc-c${i}-j-${jg.id}" value="${(c.effets && c.effets[jg.id]) || 0}" style="width:70px;padding:5px 7px">
           </span>`).join('')}
       </div>` : ''}
+      ${marqueurs.length ? `
+      <label style="margin-bottom:4px">🔖 Ce choix pose</label>
+      <div class="check-grid" style="margin-bottom:10px">
+        ${marqueurs.map(mk => `
+          <label class="check-label">
+            <input type="checkbox" id="sc-c${i}-m-${mk.id}" ${(c.marques||[]).includes(mk.id)?'checked':''}>${mk.emoji||'🔖'} ${escHtml(mk.nom)}
+          </label>`).join('')}
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Ce choix n'apparaît que si…</label>
+        <select id="sc-c${i}-cond">
+          <option value="">Toujours visible</option>
+          ${marqueurs.map(mk => `
+            <option value="pose:${mk.id}" ${c.condition && c.condition.etat==='pose' && c.condition.id===mk.id ? 'selected':''}>✓ ${escHtml(mk.nom)} — posé</option>
+            <option value="absent:${mk.id}" ${c.condition && c.condition.etat==='absent' && c.condition.id===mk.id ? 'selected':''}>✕ ${escHtml(mk.nom)} — pas posé</option>`).join('')}
+        </select>
+      </div>` : ''}
     </div>`).join('');
 }
 
 function mgSyncChoix() {
-  const jauges = mgJauges(mgJeu(_sf.jeuId));
+  const jeu = mgJeu(_sf.jeuId);
+  const jauges = mgJauges(jeu);
+  const marqueurs = mgMarqueurs(jeu);
   _sf.choix = _sf.choix.map((c,i) => {
     const effets = {};
     jauges.forEach(jg => {
       const v = parseInt(document.getElementById(`sc-c${i}-j-${jg.id}`)?.value, 10);
       if (v) effets[jg.id] = v;
     });
+    const marques = [];
+    marqueurs.forEach(mk => { if (document.getElementById(`sc-c${i}-m-${mk.id}`)?.checked) marques.push(mk.id); });
+    let condition = c.condition || null;
+    const sel = document.getElementById(`sc-c${i}-cond`);
+    if (sel) {
+      const v = sel.value;
+      condition = v ? {etat: v.split(':')[0], id: v.split(':')[1]} : null;
+    }
     return {
       id: c.id || uid(),
       texte: document.getElementById(`sc-c${i}-texte`)?.value.trim() ?? c.texte,
       consequence: document.getElementById(`sc-c${i}-consequence`)?.value.trim() ?? c.consequence,
       suivantId: document.getElementById(`sc-c${i}-suivant`)?.value ?? c.suivantId,
-      effets,
+      effets, marques, condition,
     };
   });
 }
 function mgAddChoix() {
   mgSyncChoix();
-  _sf.choix.push({id:uid(), texte:'', consequence:'', suivantId:'', effets:{}});
+  _sf.choix.push({id:uid(), texte:'', consequence:'', suivantId:'', effets:{}, marques:[], condition:null});
   document.getElementById('sc-choix').innerHTML = mgChoixRows();
 }
 function mgRemoveChoix(i) {
@@ -1848,11 +1928,20 @@ function mgSeedCarte() {
 }
 
 // ── Mode test : jouer la partie ──
-let _play = {jeuId:null, sceneId:null, jauges:{}, consequence:null, suivantId:null, nbChoix:0};
+let _play = {jeuId:null, sceneId:null, jauges:{}, marques:{}, consequence:null, suivantId:null, nbChoix:0};
 
 function mgResetPlay(jeu) {
-  _play = {jeuId: jeu.id, sceneId: mgSceneDepart(jeu), jauges:{}, consequence:null, suivantId:null, nbChoix:0};
+  _play = {jeuId: jeu.id, sceneId: mgSceneDepart(jeu), jauges:{}, marques:{}, consequence:null, suivantId:null, nbChoix:0};
   mgJauges(jeu).forEach(jg => { _play.jauges[jg.id] = Number(jg.depart) || 0; });
+}
+
+// Un choix conditionné n'apparaît que si son marqueur est dans le bon état.
+function mgChoixVisibles(sc) {
+  return (sc.choix || []).filter(c => {
+    if (!c.condition || !c.condition.id) return true;
+    const pose = !!(_play.marques && _play.marques[c.condition.id]);
+    return c.condition.etat === 'absent' ? !pose : pose;
+  });
 }
 
 function renderJeuPlay(jeuId) {
@@ -1860,8 +1949,10 @@ function renderJeuPlay(jeuId) {
   if (_play.jeuId !== jeuId) mgResetPlay(jeu);
   const p = jeu.personnage || {};
 
-  const jaugesBar = mgJauges(jeu).length ? `<div class="mg-jauges">
+  const marquesPosees = mgMarqueurs(jeu).filter(mk => _play.marques && _play.marques[mk.id]);
+  const jaugesBar = (mgJauges(jeu).length || marquesPosees.length) ? `<div class="mg-jauges">
     ${mgJauges(jeu).map(jg => `<span class="mg-jauge">${jg.emoji||'📊'} ${escHtml(jg.nom)} : <strong>${_play.jauges[jg.id] ?? 0}</strong></span>`).join('')}
+    ${marquesPosees.map(mk => `<span class="mg-jauge" style="background:var(--amber-light);border-color:var(--amber)">${mk.emoji||'🔖'} ${escHtml(mk.nom)}</span>`).join('')}
   </div>` : '';
 
   const barre = `
@@ -1894,7 +1985,7 @@ function renderJeuPlay(jeuId) {
       <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="navigate('#margot/jeux/${jeu.id}')">✏️ Revenir à l'éditeur</button>`;
   }
 
-  const choix = sc.choix || [];
+  const choix = mgChoixVisibles(sc);
   return `${barre}
     <div style="font-weight:700;color:var(--green-dark);margin-bottom:8px">${sc.emoji||'🎬'} ${escHtml(sc.titre||'')}</div>
     ${sc.personnage ? `<div class="mg-muted" style="margin-bottom:8px">👤 ${escHtml(sc.personnage)}</div>` : ''}
@@ -1908,11 +1999,12 @@ function renderJeuPlay(jeuId) {
 function mgChoisir(i) {
   const jeu = mgJeu(_play.jeuId);
   const sc = mgScene(jeu, _play.sceneId);
-  const c = sc && (sc.choix||[])[i];
+  const c = sc && mgChoixVisibles(sc)[i];
   if (!c) return;
   Object.entries(c.effets || {}).forEach(([jid, delta]) => {
     _play.jauges[jid] = (_play.jauges[jid] || 0) + Number(delta || 0);
   });
+  (c.marques || []).forEach(mid => { _play.marques[mid] = true; });
   _play.nbChoix++;
   _play.suivantId = c.suivantId || null;
   if (c.consequence) { _play.consequence = c.consequence; }
@@ -2283,12 +2375,29 @@ function mgAideJeux() {
     <p><strong>1. Caractérisation.</strong> Aucune conséquence, ou ±1 sur une jauge. Son rôle : laisser le joueur décider <em>qui est</em> le personnage. Répondre sèchement ou en plaisantant, regarder ou détourner les yeux. C'est ce qui crée l'attachement.</p>
     <p><strong>2. Ressource.</strong> Il coûte et il rapporte. Une jauge monte, l'autre descend.</p>
     <p><strong>3. Branche.</strong> Il change le chemin : la rencontre suivante ne sera pas la même.</p>
-    <p><strong>4. À retardement.</strong> Rien ne se passe sur le moment, et trois rencontres plus tard quelqu'un s'en souvient. Les plus satisfaisants, les plus durs à écrire.</p>
+    <p><strong>4. À retardement.</strong> Rien ne se passe sur le moment, et trois rencontres plus tard quelqu'un s'en souvient. Les plus satisfaisants, les plus durs à écrire — et c'est à ça que servent les <strong>marqueurs</strong> (fiche suivante).</p>
     <div class="mg-guide-key">Le rythme qui marche : <strong>2 à 4 petits choix de caractérisation, puis une décision qui compte</strong> — souvent la dernière de la scène. Les petits installent la voix du personnage, le dernier serre.</div>
     <p><strong>Le seul vrai piège</strong>, c'est que tout soit décoratif : le joueur cesse de lire les options et clique au hasard. Il faut qu'il se fasse surprendre de temps en temps par une conséquence réelle. Une par scène suffit.</p>
-    <p class="mg-muted">Note : dans l'app, seules les jauges gardent la mémoire des choix. Un effet à retardement se construit à la main, en écrivant la suite en conséquence.</p>`) +
+`) +
 
-  mgFiche(3, "Trouver les choix : trois questions", `
+  mgFiche(3, "Les marqueurs : ce dont l'histoire se souvient", `
+    <p>Une jauge compte. Un marqueur, lui, retient <strong>un fait</strong> : elle a emporté l'objet, elle a menti au capitaine, elle a vu ce qu'il y avait derrière la porte.</p>
+    <p><strong>Comment ça marche</strong></p>
+    <ul>
+      <li>Tu déclares tes marqueurs dans <em>Modifier le jeu</em>, comme les jauges.</li>
+      <li>Dans une rencontre, un choix peut <strong>poser</strong> un ou plusieurs marqueurs.</li>
+      <li>Un autre choix, n'importe où plus loin, peut n'apparaître <strong>que si</strong> un marqueur est posé — ou que s'il ne l'est pas.</li>
+    </ul>
+    <div class="mg-guide-key">C'est la différence entre un objet et ce qu'il permet. Emporter un outil n'apprend rien sur le moment : ça pose un marqueur. Trois rencontres plus tard, ce marqueur ouvre une option que les autres joueurs n'auront jamais vue.</div>
+    <p><strong>Trois usages qui marchent</strong></p>
+    <ul>
+      <li><strong>L'objet</strong> — le prendre ne rapporte rien tout de suite, et change tout au moment où il sert.</li>
+      <li><strong>La dette</strong> — quelqu'un t'a couverte ; plus tard, il ose te demander quelque chose.</li>
+      <li><strong>Le mensonge</strong> — tu as dit une chose ; l'option « avouer » n'existe que si tu l'as dite.</li>
+    </ul>
+    <p><strong>Deux pièges</strong> : ne pose pas de marqueur que tu n'utilises jamais — c'est une promesse en l'air. Et vérifie qu'une rencontre garde toujours au moins un choix visible, sinon elle se termine sans que le joueur comprenne pourquoi.</p>`) +
+
+  mgFiche(4, "Trouver les choix : trois questions", `
     <p>C'est la partie la plus difficile, pour tout le monde. Une décision n'est pas une liste d'options : c'est un <strong>conflit entre deux choses que le personnage veut en même temps</strong>.</p>
     <p>Trois questions, dans cet ordre :</p>
     <ul>
@@ -2306,7 +2415,7 @@ function mgAideJeux() {
     </ul>
     <div class="mg-guide-key">Pour une première rencontre : la décision doit être <strong>petite et pas chère</strong>. Son rôle n'est pas de mettre le personnage à l'épreuve, c'est d'apprendre au joueur que ses choix comptent.</div>`) +
 
-  mgFiche(4, "Vise petit : 5 rencontres, 2 ou 3 fins", `
+  mgFiche(5, "Vise petit : 5 rencontres, 2 ou 3 fins", `
     <p>Ne construis pas un arbre géant, il explose en branches et tu abandonnes.</p>
     <div class="mg-guide-tree">     Rencontre 1  (la mise en place)
            ↓
@@ -2315,12 +2424,12 @@ function mgAideJeux() {
    Fin A       Fin B</div>
     <div class="mg-guide-key">Pour éviter l'explosion : fais <strong>converger</strong> tes chemins. Deux choix différents peuvent mener à la même rencontre suivante — ce sont les jauges qui gardent la mémoire de ce qui a été choisi.</div>`) +
 
-  mgFiche(5, "Écris les choix avant la scène", `
+  mgFiche(6, "Écris les choix avant la scène", `
     <p>Contre-intuitif, mais très efficace. Note d'abord les 2 ou 3 décisions possibles, <strong>puis</strong> écris la situation qui rend ces décisions difficiles.</p>
     <p>La scène n'existe que pour ça : donner au joueur juste assez d'informations pour hésiter, et pas assez pour être sûr.</p>
     <div class="mg-guide-key">Ce n'est pas une loi. Si ça te bloque, écris la scène comme elle vient, puis relis-la en cherchant <strong>le moment où elle hésite</strong> : il y en a toujours un, et c'est là que se placent tes choix.</div>`) +
 
-  mgFiche(6, "Le ton du texte d'une rencontre", `
+  mgFiche(7, "Le ton du texte d'une rencontre", `
     <ul>
       <li><strong>Court</strong> : 3 à 5 phrases. On lit sur un téléphone, entre deux choses.</li>
       <li><strong>Au présent</strong> : « Elle lâche son sac » — pas « elle lâcha ».</li>
@@ -2329,7 +2438,7 @@ function mgAideJeux() {
     </ul>
     <div class="mg-guide-ex">« En sortant du marché, tu vois une vieille dame lâcher son sac. Les oranges roulent sur le trottoir. Personne ne s'arrête. Tu es déjà en retard. »</div>`) +
 
-  mgFiche(7, "Teste tôt, teste souvent", `
+  mgFiche(8, "Teste tôt, teste souvent", `
     <p>Le bouton <strong>▶️ Tester</strong> est ton meilleur relecteur. Joue ton jeu après chaque rencontre ajoutée, et surtout : joue le chemin que tu n'avais pas prévu.</p>
     <div class="mg-guide-key">Si en jouant tu choisis toujours la même option, c'est que l'autre n'est pas assez tentante. Rends-la meilleure au lieu d'affaiblir la première.</div>`);
 }
