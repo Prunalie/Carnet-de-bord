@@ -186,6 +186,9 @@ body.maison-mode #maison-app{display:block}
 .mg-home-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
 .mg-home-icon{font-size:2rem;line-height:1;flex-shrink:0}
 .mg-tension{background:var(--amber-light);border-left:3px solid var(--amber);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:11px 13px;margin-top:14px;font-size:.88rem;line-height:1.55;white-space:pre-wrap}
+.mg-chapitre{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:18px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--green-light)}
+.mg-chapitre:first-child{margin-top:0}
+.mg-chapitre span{background:var(--green-light);color:var(--green-dark);border-radius:20px;padding:1px 9px;font-size:.72rem;letter-spacing:0}
 .mg-bloc{background:var(--bg);border-radius:var(--radius-sm);padding:11px 13px;margin-top:10px;font-size:.86rem;line-height:1.55;white-space:pre-wrap}
 .mg-bloc strong{color:var(--green-dark)}
 .mg-perso-ligne{display:flex;gap:8px;align-items:baseline;margin-top:7px;font-size:.85rem;line-height:1.5}
@@ -1348,15 +1351,9 @@ function deleteJeu(id) {
 }
 
 // ── Détail d'un jeu : la liste des rencontres ──
-function renderJeuDetail(id) {
-  const jeu = mgJeu(id);
-  const scenes = mgScenes(jeu);
-  const depart = mgSceneDepart(jeu);
-  const p = jeu.personnage || {};
-
-  const sceneCards = scenes.map(sc => {
-    const choix = sc.choix || [];
-    return `
+function mgSceneCarte(jeu, sc, depart) {
+  const choix = sc.choix || [];
+  return `
     <div class="mg-scene${sc.id===depart?' depart':''}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
         <div style="flex:1;min-width:0">
@@ -1382,10 +1379,45 @@ function renderJeuDetail(id) {
           </div>`;
         }).join('')}
       </div>` : `<div class="mg-muted" style="margin-top:8px;font-style:italic">Aucun choix — cette rencontre termine l'histoire.</div>`}
-      ${sc.id!==depart ? `<button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="setSceneDepart('${jeu.id}','${sc.id}')">Définir comme départ</button>` : ''}
+      <div class="flex-gap" style="margin-top:10px">
+        <button class="btn btn-outline btn-sm" onclick="enchainerScene('${jeu.id}','${sc.id}')" title="Créer la rencontre suivante et y relier les choix">⛓️ Enchaîner</button>
+        ${sc.id!==depart ? `<button class="btn btn-outline btn-sm" onclick="setSceneDepart('${jeu.id}','${sc.id}')">Définir comme départ</button>` : ''}
+      </div>
     </div>`;
-  }).join('');
+}
 
+// Les rencontres, regroupées par chapitre
+function mgScenesGroupees(jeu, scenes, depart) {
+  const groupes = [];
+  scenes.forEach(sc => {
+    const ch = (sc.chapitre || '').trim();
+    let g = groupes.find(x => x.nom === ch);
+    if (!g) { g = {nom: ch, items: []}; groupes.push(g); }
+    g.items.push(sc);
+  });
+  const avecNom = groupes.some(g => g.nom);
+  return groupes.map(g => {
+    const titre = avecNom
+      ? `<div class="mg-chapitre">${escHtml(g.nom || 'Hors chapitre')} <span>${g.items.length}</span></div>`
+      : '';
+    return titre + g.items.map(sc => mgSceneCarte(jeu, sc, depart)).join('');
+  }).join('');
+}
+
+// Enchaîner : crée la rencontre suivante et y relie les choix restés sans suite
+let _mgEnchainerDe = null;
+function enchainerScene(jeuId, sceneId) {
+  _mgEnchainerDe = sceneId;
+  navigate('#margot/jeux/' + jeuId + '/scene/nouvelle');
+}
+
+function renderJeuDetail(id) {
+  const jeu = mgJeu(id);
+  const scenes = mgScenes(jeu);
+  const depart = mgSceneDepart(jeu);
+  const p = jeu.personnage || {};
+  _mgEnchainerDe = null;
+  const sceneCards = mgScenesGroupees(jeu, scenes, depart);
   return `
     <div class="mg-card">
       <div style="display:flex;align-items:flex-start;gap:14px">
@@ -1456,9 +1488,16 @@ function deleteScene(jeuId, sceneId) {
 // ── Formulaire d'une rencontre (scène + choix) ──
 let _sf = {jeuId:null, choix:[]};
 
+function mgChapitres(jeu) {
+  const vus = [];
+  mgScenes(jeu).forEach(s => { const c = (s.chapitre||'').trim(); if (c && !vus.includes(c)) vus.push(c); });
+  return vus;
+}
+
 function renderSceneForm(jeuId, sceneId) {
   const jeu = mgJeu(jeuId);
   const sc = (sceneId && sceneId !== 'nouvelle') ? mgScene(jeu, sceneId) : null;
+  const parent = (!sc && _mgEnchainerDe) ? mgScene(jeu, _mgEnchainerDe) : null;
   _sf.jeuId = jeuId;
   _sf.choix = sc ? JSON.parse(JSON.stringify(sc.choix || [])) : [{id:uid(), texte:'', consequence:'', suivantId:'', effets:{}}];
 
@@ -1466,6 +1505,7 @@ function renderSceneForm(jeuId, sceneId) {
     <div class="mg-card">
       <h2 style="font-size:1.05rem;color:var(--green-dark);margin-bottom:4px">${sc ? 'Modifier la rencontre' : 'Nouvelle rencontre'}</h2>
       <p class="mg-muted" style="margin-bottom:16px">Une situation, la personne croisée, et les décisions possibles.</p>
+      ${parent ? `<div class="mg-guide-key" style="margin-bottom:16px">⛓️ En enregistrant, cette rencontre sera reliée depuis <strong>${escHtml(parent.titre||'Sans titre')}</strong> : tous ses choix qui ne mènent nulle part pointeront ici.</div>` : ''}
 
       <div class="two-col">
         <div class="form-group">
@@ -1480,6 +1520,12 @@ function renderSceneForm(jeuId, sceneId) {
       <div class="form-group">
         <label>Qui croise-t-on ?</label>
         <input type="text" id="sc-perso" placeholder="Ex : Une vieille dame les bras chargés" value="${escHtml(sc?(sc.personnage||''):'')}">
+      </div>
+      <div class="form-group">
+        <label>📖 Chapitre / journée (optionnel)</label>
+        <input type="text" id="sc-chapitre" list="sc-chapitres" placeholder="Ex : Jour 1 — le départ" value="${escHtml(sc ? (sc.chapitre||'') : (parent ? (parent.chapitre||'') : ''))}">
+        <datalist id="sc-chapitres">${mgChapitres(jeu).map(ch=>`<option value="${escHtml(ch)}">`).join('')}</datalist>
+        <div class="mg-muted" style="margin-top:4px">Sert à regrouper les rencontres d'une même scène dans la liste.</div>
       </div>
       <div class="form-group">
         <label>La situation — le texte lu par le joueur *</label>
@@ -1583,6 +1629,7 @@ function saveScene(jeuId, sceneId) {
     titre,
     emoji: g('sc-emoji') || '🎬',
     personnage: g('sc-perso'),
+    chapitre: g('sc-chapitre'),
     texte,
     choix: _sf.choix.filter(c => c.texte),
   };
@@ -1590,8 +1637,21 @@ function saveScene(jeuId, sceneId) {
   const idx = sceneId ? jeu.scenes.findIndex(s => s.id === sceneId) : -1;
   if (idx >= 0) jeu.scenes[idx] = scene; else jeu.scenes.push(scene);
   if (!jeu.sceneDepart) jeu.sceneDepart = scene.id;
+
+  let relies = 0, deja = 0;
+  if (!sceneId && _mgEnchainerDe) {
+    const parent = mgScene(jeu, _mgEnchainerDe);
+    if (parent) (parent.choix || []).forEach(c => {
+      if (!c.suivantId) { c.suivantId = scene.id; relies++; } else { deja++; }
+    });
+    _mgEnchainerDe = null;
+  }
   save();
-  showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
+  if (relies) {
+    showToast(`⛓️ ${relies} choix relié${relies>1?'s':''}${deja?` · ${deja} déjà relié${deja>1?'s':''}, laissé${deja>1?'s':''} tel quel`:''}`);
+  } else {
+    showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
+  }
   navigate('#margot/jeux/' + jeuId);
 }
 
@@ -2218,16 +2278,35 @@ function mgAideJeux() {
     <p style="margin-top:12px">Deux jauges suffisent largement. Trois, c'est déjà difficile à équilibrer.</p>
     <p class="mg-muted">À savoir : pour l'instant les jauges bougent pendant la partie mais ne changent pas la fin automatiquement. Les fins dépendent du chemin de choix.</p>`, true) +
 
-  mgFiche(2, "Un choix doit coûter", `
-    <div class="mg-guide-key">Un bon choix fait <strong>monter une jauge et descendre l'autre</strong>. Si un choix ne coûte rien, ce n'est pas un choix — c'est une récompense.</div>
-    <p>Test rapide : lis tes deux options. Si tu sais laquelle est « la bonne », supprime-la, ou rends-la chère.</p>
-    <div class="mg-guide-ex">
-      « Ramasser les oranges avec elle » → ❤️ +2 · 🔋 −1<br>
-      « Passer ton chemin » → ❤️ −2 · 🔋 +1
-    </div>
-    <p>Aucune des deux n'est gratuite : c'est ça qui rend la décision intéressante.</p>`) +
+  mgFiche(2, "Les quatre types de choix", `
+    <p>Tous les choix ne servent pas à la même chose, et c'est une erreur de vouloir que chacun soit un dilemme.</p>
+    <p><strong>1. Caractérisation.</strong> Aucune conséquence, ou ±1 sur une jauge. Son rôle : laisser le joueur décider <em>qui est</em> le personnage. Répondre sèchement ou en plaisantant, regarder ou détourner les yeux. C'est ce qui crée l'attachement.</p>
+    <p><strong>2. Ressource.</strong> Il coûte et il rapporte. Une jauge monte, l'autre descend.</p>
+    <p><strong>3. Branche.</strong> Il change le chemin : la rencontre suivante ne sera pas la même.</p>
+    <p><strong>4. À retardement.</strong> Rien ne se passe sur le moment, et trois rencontres plus tard quelqu'un s'en souvient. Les plus satisfaisants, les plus durs à écrire.</p>
+    <div class="mg-guide-key">Le rythme qui marche : <strong>2 à 4 petits choix de caractérisation, puis une décision qui compte</strong> — souvent la dernière de la scène. Les petits installent la voix du personnage, le dernier serre.</div>
+    <p><strong>Le seul vrai piège</strong>, c'est que tout soit décoratif : le joueur cesse de lire les options et clique au hasard. Il faut qu'il se fasse surprendre de temps en temps par une conséquence réelle. Une par scène suffit.</p>
+    <p class="mg-muted">Note : dans l'app, seules les jauges gardent la mémoire des choix. Un effet à retardement se construit à la main, en écrivant la suite en conséquence.</p>`) +
 
-  mgFiche(3, "Vise petit : 5 rencontres, 2 ou 3 fins", `
+  mgFiche(3, "Trouver les choix : trois questions", `
+    <p>C'est la partie la plus difficile, pour tout le monde. Une décision n'est pas une liste d'options : c'est un <strong>conflit entre deux choses que le personnage veut en même temps</strong>.</p>
+    <p>Trois questions, dans cet ordre :</p>
+    <ul>
+      <li><strong>Qu'est-ce qu'il ou elle veut dans les cinq prochaines minutes ?</strong> Quelque chose de petit et concret — pas « réussir sa vie », plutôt « finir sans y penser ».</li>
+      <li><strong>Qu'est-ce qui l'en empêche ?</strong></li>
+      <li><strong>Qu'est-ce qu'il ou elle est prêt à perdre pour l'obtenir ?</strong></li>
+    </ul>
+    <p>Tes choix sont les différentes réponses à la troisième question.</p>
+    <div class="mg-guide-key">Test de forme : un choix s'écrit comme un <strong>verbe d'action au présent</strong> — <em>Prendre…</em>, <em>Répondre…</em>, <em>Partir sans…</em> Si tu écris « Réfléchir » ou « Être honnête », ce n'est pas encore un choix.</div>
+    <p><strong>Et si le personnage est seul dans la scène ?</strong> Une décision a besoin de quelque chose qui pousse en sens inverse. Trois façons d'en créer une :</p>
+    <ul>
+      <li><strong>L'objet</strong> — chaque objet est un « je le prends ou je le laisse », et un objet dit qui on est mieux qu'un paragraphe.</li>
+      <li><strong>L'intrusion</strong> — un message, quelqu'un qui frappe, une convocation.</li>
+      <li><strong>Le temps</strong> — il reste vingt minutes, et il manque quelque chose.</li>
+    </ul>
+    <div class="mg-guide-key">Pour une première rencontre : la décision doit être <strong>petite et pas chère</strong>. Son rôle n'est pas de mettre le personnage à l'épreuve, c'est d'apprendre au joueur que ses choix comptent.</div>`) +
+
+  mgFiche(4, "Vise petit : 5 rencontres, 2 ou 3 fins", `
     <p>Ne construis pas un arbre géant, il explose en branches et tu abandonnes.</p>
     <div class="mg-guide-tree">     Rencontre 1  (la mise en place)
            ↓
@@ -2236,11 +2315,12 @@ function mgAideJeux() {
    Fin A       Fin B</div>
     <div class="mg-guide-key">Pour éviter l'explosion : fais <strong>converger</strong> tes chemins. Deux choix différents peuvent mener à la même rencontre suivante — ce sont les jauges qui gardent la mémoire de ce qui a été choisi.</div>`) +
 
-  mgFiche(4, "Écris les choix avant la scène", `
+  mgFiche(5, "Écris les choix avant la scène", `
     <p>Contre-intuitif, mais très efficace. Note d'abord les 2 ou 3 décisions possibles, <strong>puis</strong> écris la situation qui rend ces décisions difficiles.</p>
-    <p>La scène n'existe que pour ça : donner au joueur juste assez d'informations pour hésiter, et pas assez pour être sûr.</p>`) +
+    <p>La scène n'existe que pour ça : donner au joueur juste assez d'informations pour hésiter, et pas assez pour être sûr.</p>
+    <div class="mg-guide-key">Ce n'est pas une loi. Si ça te bloque, écris la scène comme elle vient, puis relis-la en cherchant <strong>le moment où elle hésite</strong> : il y en a toujours un, et c'est là que se placent tes choix.</div>`) +
 
-  mgFiche(5, "Le ton du texte d'une rencontre", `
+  mgFiche(6, "Le ton du texte d'une rencontre", `
     <ul>
       <li><strong>Court</strong> : 3 à 5 phrases. On lit sur un téléphone, entre deux choses.</li>
       <li><strong>Au présent</strong> : « Elle lâche son sac » — pas « elle lâcha ».</li>
@@ -2249,7 +2329,7 @@ function mgAideJeux() {
     </ul>
     <div class="mg-guide-ex">« En sortant du marché, tu vois une vieille dame lâcher son sac. Les oranges roulent sur le trottoir. Personne ne s'arrête. Tu es déjà en retard. »</div>`) +
 
-  mgFiche(6, "Teste tôt, teste souvent", `
+  mgFiche(7, "Teste tôt, teste souvent", `
     <p>Le bouton <strong>▶️ Tester</strong> est ton meilleur relecteur. Joue ton jeu après chaque rencontre ajoutée, et surtout : joue le chemin que tu n'avais pas prévu.</p>
     <div class="mg-guide-key">Si en jouant tu choisis toujours la même option, c'est que l'autre n'est pas assez tentante. Rends-la meilleure au lieu d'affaiblir la première.</div>`);
 }
