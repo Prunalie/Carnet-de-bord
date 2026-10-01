@@ -972,8 +972,8 @@ const MG_TABS = [
 ];
 
 const MG_SECTIONS = [
-  {id:'jeux',      icon:'🎮', titre:'Mes jeux de décision',
-   desc:"Des histoires dont on est le personnage, où chaque rencontre demande une décision."},
+  {id:'jeux',      icon:'🎮', titre:'Jeux',
+   desc:"Les jeux de décision, et tout ce qui viendra se ranger à côté."},
   {id:'histoires', icon:'✍️', titre:'Mes histoires',
    desc:"Écrire des textes, des nouvelles, des débuts de romans — au calme."},
   {id:'idees',     icon:'💡', titre:'Mes idées',
@@ -987,51 +987,59 @@ function setMargotTab(id) { navigate('#margot/' + id); }
 function renderMargotSpace() {
   let content = '', title = 'Espace Margot', back = '#', showNav = true;
 
-  if (_margotTab === 'jeux') {
+  if (_margotTab === 'decision') {
     const jeu = (_margotId && _margotId !== 'nouveau') ? mgJeu(_margotId) : null;
 
     if (_margotId === 'nouveau') {
-      title = 'Nouveau jeu'; back = '#margot/jeux'; showNav = false;
+      title = 'Nouveau jeu'; back = '#margot/decision'; showNav = false;
       content = renderJeuForm(null);
 
     } else if (_margotId && !jeu) {
-      title = 'Mes jeux'; back = '#margot/jeux';
+      title = 'Mes jeux'; back = '#margot/decision';
       content = `<div class="empty-state"><div class="icon">🤔</div><p>Ce jeu n'existe plus.</p>
-        <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/jeux')">Retour aux jeux</button></div>`;
+        <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('#margot/decision')">Retour aux jeux</button></div>`;
 
     } else if (jeu && _margotView === 'modifier') {
-      title = 'Modifier le jeu'; back = '#margot/jeux/' + jeu.id; showNav = false;
+      title = 'Modifier le jeu'; back = '#margot/decision/' + jeu.id; showNav = false;
       content = renderJeuForm(jeu.id);
 
     } else if (jeu && _margotView === 'bible') {
       showNav = false;
       if (_margotSubId) {
         title = _margotSubId === 'nouvelle' ? 'Nouvelle fiche' : 'Modifier la fiche';
-        back = '#margot/jeux/' + jeu.id + '/bible';
+        back = '#margot/decision/' + jeu.id + '/bible';
         content = renderBibleForm(jeu.id, _margotSubId);
       } else {
         title = 'Bible — ' + (jeu.titre || '');
-        back = '#margot/jeux/' + jeu.id;
+        back = '#margot/decision/' + jeu.id;
         content = renderJeuBible(jeu.id);
       }
 
     } else if (jeu && _margotView === 'scene') {
       title = _margotSubId === 'nouvelle' ? 'Nouvelle rencontre' : 'Modifier la rencontre';
-      back = '#margot/jeux/' + jeu.id; showNav = false;
+      back = '#margot/decision/' + jeu.id; showNav = false;
       content = renderSceneForm(jeu.id, _margotSubId);
 
     } else if (jeu && _margotView === 'jouer') {
-      title = jeu.titre || 'Partie'; back = '#margot/jeux/' + jeu.id; showNav = false;
+      title = jeu.titre || 'Partie'; back = '#margot/decision/' + jeu.id; showNav = false;
       content = renderJeuPlay(jeu.id);
 
     } else if (jeu) {
-      title = jeu.titre || 'Jeu'; back = '#margot/jeux'; showNav = false;
+      title = jeu.titre || 'Jeu'; back = '#margot/decision'; showNav = false;
       content = renderJeuDetail(jeu.id);
 
     } else {
-      title = 'Mes jeux'; back = '#margot';
+      title = 'Jeux de décision'; back = '#margot/jeux';
       content = renderJeuxListe();
     }
+
+  } else if (_margotTab === 'jeux') {
+    title = 'Jeux'; back = '#margot';
+    content = renderJeuxMenu();
+
+  } else if (_margotTab === 'gestion') {
+    title = 'Jeu de gestion'; back = '#margot/jeux';
+    content = renderJeuGestion();
 
   } else if (_margotTab === 'histoires') {
     const h = (_margotId && _margotId !== 'nouvelle') ? mgHistoire(_margotId) : null;
@@ -1070,8 +1078,9 @@ function renderMargotSpace() {
     content = renderMargotHome();
   }
 
+  const ongletActif = ['decision','gestion'].includes(_margotTab) ? 'jeux' : _margotTab;
   const nav = showNav ? `<div class="ch-nav">${MG_TABS.map(t =>
-    `<button class="${t.id===_margotTab?'active':''}" onclick="setMargotTab('${t.id}')">
+    `<button class="${t.id===ongletActif?'active':''}" onclick="setMargotTab('${t.id}')">
       <span class="ch-ni">${t.icon}</span>${t.label}
     </button>`).join('')}</div>` : '';
 
@@ -1125,14 +1134,55 @@ function renderMargotHome() {
     </div>
     ${cards}
     <div class="flex-gap" style="margin-top:16px">
-      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Jeu</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/decision/nouveau')">＋ Jeu de décision</button>
       <button class="btn btn-primary btn-sm" onclick="navigate('#margot/histoires/nouvelle')">＋ Texte</button>
       <button class="btn btn-outline btn-sm" onclick="navigate('#margot/idees')">＋ Idée</button>
     </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
-// MARGOT — MES JEUX DE DÉCISION
+// MARGOT — JEUX
+// ═══════════════════════════════════════════════════════
+const MG_JEUX_SECTIONS = [
+  {id:'decision', icon:'🎮', titre:'Jeux de décision',
+   desc:"Des histoires dont on est le personnage, où chaque rencontre demande une décision."},
+  {id:'gestion',  icon:'🏗️', titre:'Jeu de gestion',
+   desc:"À construire."},
+];
+
+function renderJeuxMenu() {
+  const stat = id => {
+    if (id !== 'decision') return 'Page vide pour l\'instant';
+    const n = mgJeux().length;
+    const sc = mgJeux().reduce((s,j)=>s+mgScenes(j).length,0);
+    return n ? `${n} jeu${n>1?'x':''} · ${sc} rencontre${sc>1?'s':''}` : 'Rien pour le moment';
+  };
+  return `
+    <h2 style="font-size:1.15rem;color:var(--green-dark);margin-bottom:14px">🎮 Jeux</h2>
+    ${MG_JEUX_SECTIONS.map(s => `
+      <div class="mg-home-card" onclick="navigate('#margot/${s.id}')">
+        <div class="mg-home-icon">${s.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mg-card-title">${s.titre}</div>
+          <div class="mg-muted" style="margin-top:2px">${s.desc}</div>
+          <div class="mg-badge" style="margin-top:8px">${stat(s.id)}</div>
+        </div>
+        <div style="color:var(--text-muted);font-size:1.2rem;flex-shrink:0">›</div>
+      </div>`).join('')}`;
+}
+
+function renderJeuGestion() {
+  return `
+    <div class="empty-state">
+      <div class="icon">🏗️</div>
+      <h3 style="color:var(--green-dark);font-size:1.05rem">Jeu de gestion</h3>
+      <p style="margin-top:8px">Cette page est vide pour l'instant.</p>
+      <p style="font-size:.85rem;margin-top:6px">Elle attend que tu décides ce qu'on y met : ce qu'on gère, ce qui monte, ce qui s'effondre.</p>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// MARGOT — JEUX DE DÉCISION
 // ═══════════════════════════════════════════════════════
 function mgJeux() {
   if (!state.margot) state.margot = {};
@@ -1157,7 +1207,7 @@ function renderJeuxListe() {
     const nbS = mgScenes(j).length;
     const nbC = mgScenes(j).reduce((s,sc)=>s+((sc.choix||[]).length),0);
     return `
-    <div class="mg-card clickable" onclick="navigate('#margot/jeux/${j.id}')">
+    <div class="mg-card clickable" onclick="navigate('#margot/decision/${j.id}')">
       <div style="display:flex;align-items:flex-start;gap:14px">
         <div style="font-size:2rem;line-height:1">${j.emoji || '🎲'}</div>
         <div style="flex:1;min-width:0">
@@ -1176,7 +1226,7 @@ function renderJeuxListe() {
   return `
     <div class="section-header" style="margin-bottom:14px">
       <h2 style="font-size:1.15rem;color:var(--green-dark)">🎮 Mes jeux de décision</h2>
-      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/nouveau')">＋ Nouveau jeu</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/decision/nouveau')">＋ Nouveau jeu</button>
     </div>
     <div class="mg-guide-cta" onclick="navigate('#margot/aide/jeux')">
       <span style="font-size:1.3rem">📚</span>
@@ -1189,7 +1239,7 @@ function renderJeuxListe() {
         <div class="icon">🎲</div>
         <p>Aucun jeu pour l'instant.</p>
         <p style="font-size:.85rem;margin-top:6px">Crée ton personnage principal, puis ajoute les personnes qu'il croise et les décisions à prendre.</p>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/jeux/nouveau')">＋ Créer mon premier jeu</button>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/decision/nouveau')">＋ Créer mon premier jeu</button>
       </div>`}`;
 }
 
@@ -1284,7 +1334,7 @@ function renderJeuForm(id) {
       <div id="jf-marqueurs">${mgMarqueurRows()}</div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-        <button class="btn btn-outline" onclick="navigate('${j ? '#margot/jeux/'+j.id : '#margot/jeux'}')">Annuler</button>
+        <button class="btn btn-outline" onclick="navigate('${j ? '#margot/decision/'+j.id : '#margot/decision'}')">Annuler</button>
         <button class="btn btn-primary" onclick="saveJeu(${j ? `'${j.id}'` : ''})">${j ? 'Enregistrer' : 'Créer le jeu'}</button>
       </div>
     </div>`;
@@ -1386,7 +1436,7 @@ function saveJeu(id) {
   if (idx >= 0) list[idx] = jeu; else list.push(jeu);
   save();
   showToast(id ? '✅ Jeu enregistré' : '🎮 Jeu créé !');
-  navigate('#margot/jeux/' + jeu.id);
+  navigate('#margot/decision/' + jeu.id);
 }
 
 function deleteJeu(id) {
@@ -1395,7 +1445,7 @@ function deleteJeu(id) {
   if (!confirm(`Supprimer définitivement « ${j.titre} » et toutes ses rencontres ?`)) return;
   state.margot.jeux = mgJeux().filter(x => x.id !== id);
   save();
-  navigate('#margot/jeux');
+  navigate('#margot/decision');
 }
 
 // ── Détail d'un jeu : la liste des rencontres ──
@@ -1413,7 +1463,7 @@ function mgSceneCarte(jeu, sc, depart) {
           ${sc.texte ? `<div class="mg-muted" style="margin-top:6px;white-space:pre-wrap">${escHtml(sc.texte.length>140?sc.texte.slice(0,140)+'…':sc.texte)}</div>` : ''}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="li-btn" title="Modifier" onclick="navigate('#margot/jeux/${jeu.id}/scene/${sc.id}')">✏️</button>
+          <button class="li-btn" title="Modifier" onclick="navigate('#margot/decision/${jeu.id}/scene/${sc.id}')">✏️</button>
           <button class="li-btn" title="Supprimer" onclick="deleteScene('${jeu.id}','${sc.id}')">🗑️</button>
         </div>
       </div>
@@ -1459,7 +1509,7 @@ function mgScenesGroupees(jeu, scenes, depart) {
 let _mgEnchainerDe = null;
 function enchainerScene(jeuId, sceneId) {
   _mgEnchainerDe = sceneId;
-  navigate('#margot/jeux/' + jeuId + '/scene/nouvelle');
+  navigate('#margot/decision/' + jeuId + '/scene/nouvelle');
 }
 
 function renderJeuDetail(id) {
@@ -1494,23 +1544,23 @@ function renderJeuDetail(id) {
         ${mgMarqueurs(jeu).map(mk=>`<span class="mg-jauge" style="background:var(--amber-light);border-color:var(--amber)">${mk.emoji||'🔖'} ${escHtml(mk.nom)}</span>`).join('')}
       </div>` : ''}
       <div class="flex-gap" style="margin-top:16px">
-        <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/jouer')" ${scenes.length?'':'disabled style="opacity:.5"'}>▶️ Tester</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/bible')">📓 Bible${mgBible(jeu).length?' ('+mgBible(jeu).length+')':''}</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/modifier')">✏️ Modifier</button>
+        <button class="btn btn-primary btn-sm" onclick="navigate('#margot/decision/${jeu.id}/jouer')" ${scenes.length?'':'disabled style="opacity:.5"'}>▶️ Tester</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/decision/${jeu.id}/bible')">📓 Bible${mgBible(jeu).length?' ('+mgBible(jeu).length+')':''}</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('#margot/decision/${jeu.id}/modifier')">✏️ Modifier</button>
         <button class="btn btn-danger btn-sm" onclick="deleteJeu('${jeu.id}')">🗑️ Supprimer</button>
       </div>
     </div>
 
     <div class="section-header" style="margin:20px 0 12px">
       <h2 style="font-size:1.05rem;color:var(--green-dark)">🎬 Les rencontres</h2>
-      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeu.id}/scene/nouvelle')">＋ Ajouter</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/decision/${jeu.id}/scene/nouvelle')">＋ Ajouter</button>
     </div>
     ${scenes.length ? sceneCards : `
       <div class="empty-state">
         <div class="icon">🎬</div>
         <p>Aucune rencontre pour l'instant.</p>
         <p style="font-size:.85rem;margin-top:6px">Une rencontre = une situation, une personne croisée, et les décisions possibles.</p>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/jeux/${jeu.id}/scene/nouvelle')">＋ Créer la première rencontre</button>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navigate('#margot/decision/${jeu.id}/scene/nouvelle')">＋ Créer la première rencontre</button>
       </div>`}`;
 }
 
@@ -1593,7 +1643,7 @@ function renderSceneForm(jeuId, sceneId) {
       <div id="sc-choix">${mgChoixRows()}</div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-        <button class="btn btn-outline" onclick="navigate('#margot/jeux/${jeuId}')">Annuler</button>
+        <button class="btn btn-outline" onclick="navigate('#margot/decision/${jeuId}')">Annuler</button>
         <button class="btn btn-primary" onclick="saveScene('${jeuId}'${sc?`,'${sc.id}'`:''})">${sc ? 'Enregistrer' : 'Ajouter la rencontre'}</button>
       </div>
     </div>`;
@@ -1732,7 +1782,7 @@ function saveScene(jeuId, sceneId) {
   } else {
     showToast(sceneId ? '✅ Rencontre enregistrée' : '🎬 Rencontre ajoutée');
   }
-  navigate('#margot/jeux/' + jeuId);
+  navigate('#margot/decision/' + jeuId);
 }
 
 // ── Bible du jeu : tout ce qui est décidé sur l'histoire ──
@@ -1762,7 +1812,7 @@ function renderJeuBible(jeuId) {
       <div class="mg-guide-body">
         <div class="mg-bible-txt">${escHtml(s.contenu || '')}</div>
         <div class="flex-gap" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
-          <button class="btn btn-outline btn-sm" onclick="navigate('#margot/jeux/${jeuId}/bible/${s.id}')">✏️ Modifier</button>
+          <button class="btn btn-outline btn-sm" onclick="navigate('#margot/decision/${jeuId}/bible/${s.id}')">✏️ Modifier</button>
           <button class="li-btn" onclick="moveBibleSec('${jeuId}','${s.id}',-1)" title="Monter" ${i===0?'disabled style="opacity:.3"':''}>↑</button>
           <button class="li-btn" onclick="moveBibleSec('${jeuId}','${s.id}',1)" title="Descendre" ${i===secs.length-1?'disabled style="opacity:.3"':''}>↓</button>
           <button class="li-btn" onclick="deleteBibleSec('${jeuId}','${s.id}')" title="Supprimer">🗑️</button>
@@ -1778,7 +1828,7 @@ function renderJeuBible(jeuId) {
     </div>
     <div class="section-header" style="margin-bottom:12px">
       <h2 style="font-size:1.05rem;color:var(--green-dark)">${secs.length} fiche${secs.length>1?'s':''}</h2>
-      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/jeux/${jeuId}/bible/nouvelle')">＋ Ajouter</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/decision/${jeuId}/bible/nouvelle')">＋ Ajouter</button>
     </div>
     ${secs.length ? fiches : `
       <div class="empty-state">
@@ -1786,7 +1836,7 @@ function renderJeuBible(jeuId) {
         <p>La bible est vide.</p>
         <p style="font-size:.85rem;margin-top:6px">Note ici tout ce que tu décides sur ton histoire, pour ne pas te contredire trois rencontres plus loin.</p>
         <button class="btn btn-primary" style="margin-top:16px" onclick="insererModeleBible('${jeuId}')">📋 Partir du plan type</button>
-        <button class="btn btn-outline" style="margin-top:8px" onclick="navigate('#margot/jeux/${jeuId}/bible/nouvelle')">＋ Fiche vierge</button>
+        <button class="btn btn-outline" style="margin-top:8px" onclick="navigate('#margot/decision/${jeuId}/bible/nouvelle')">＋ Fiche vierge</button>
       </div>`}`;
 }
 
@@ -1819,7 +1869,7 @@ function renderBibleForm(jeuId, secId) {
         <textarea id="bb-contenu" placeholder="Écris ici tout ce qui est décidé." style="min-height:320px;line-height:1.6">${escHtml(s?(s.contenu||''):'')}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="navigate('#margot/jeux/${jeuId}/bible')">Annuler</button>
+        <button class="btn btn-outline" onclick="navigate('#margot/decision/${jeuId}/bible')">Annuler</button>
         <button class="btn btn-primary" onclick="saveBibleSec('${jeuId}'${s?`,'${s.id}'`:''})">Enregistrer</button>
       </div>
     </div>`;
@@ -1841,7 +1891,7 @@ function saveBibleSec(jeuId, secId) {
   if (idx >= 0) list[idx] = sec; else list.push(sec);
   save();
   showToast('✅ Fiche enregistrée');
-  navigate('#margot/jeux/' + jeuId + '/bible');
+  navigate('#margot/decision/' + jeuId + '/bible');
 }
 
 function deleteBibleSec(jeuId, secId) {
@@ -1870,7 +1920,7 @@ function moveBibleSec(jeuId, secId, delta) {
 const MG_SEED_ID = 'seed-academies';
 
 function creerJeuAcademies() {
-  if (mgJeu(MG_SEED_ID)) { navigate('#margot/jeux/' + MG_SEED_ID); return; }
+  if (mgJeu(MG_SEED_ID)) { navigate('#margot/decision/' + MG_SEED_ID); return; }
   const b = (emoji, titre, contenu) => ({id:uid(), emoji, titre, contenu});
   mgJeux().push({
     id: MG_SEED_ID,
@@ -1914,7 +1964,7 @@ function creerJeuAcademies() {
   });
   save();
   showToast('📝 Notes de départ créées');
-  navigate('#margot/jeux/' + MG_SEED_ID + '/bible');
+  navigate('#margot/decision/' + MG_SEED_ID + '/bible');
 }
 
 function mgSeedCarte() {
@@ -1982,7 +2032,7 @@ function renderJeuPlay(jeuId) {
         <p style="margin-top:6px">${_play.nbChoix} décision${_play.nbChoix>1?'s':''} plus tard, l'aventure s'arrête ici.</p>
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="mgRejouer('${jeu.id}')">↺ Rejouer</button>
-      <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="navigate('#margot/jeux/${jeu.id}')">✏️ Revenir à l'éditeur</button>`;
+      <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="navigate('#margot/decision/${jeu.id}')">✏️ Revenir à l'éditeur</button>`;
   }
 
   const choix = mgChoixVisibles(sc);
