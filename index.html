@@ -222,6 +222,30 @@ body.maison-mode #maison-app{display:block}
 .mg-guide-tree{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;white-space:pre;overflow-x:auto;margin-bottom:10px}
 .mg-guide-pair{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--green-light);font-size:.87rem}
 .mg-guide-pair:last-child{border-bottom:none}
+.gs-hud{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.gs-pieces{background:var(--amber-light);border:1.5px solid var(--amber);border-radius:20px;padding:5px 14px;font-size:1rem;color:#8a6520}
+.gs-obj{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px;font-size:.88rem;line-height:1.45}
+.gs-obj-titre{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#8a6520;margin-bottom:3px}
+.gs-obj-prog{margin-top:6px;font-weight:700;color:var(--green-dark)}
+.gs-cadre{border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:3px solid #fff;max-width:640px;margin:0 auto;line-height:0}
+#gs-canvas{width:100%;display:block;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.gs-outils{display:flex;gap:6px;overflow-x:auto;padding:10px 2px 6px;margin-top:6px;scrollbar-width:thin}
+.gs-outil{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;width:70px;min-height:76px;padding:6px 4px;background:var(--card);border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;color:var(--text);transition:.15s}
+.gs-outil.actif{border-color:var(--green);background:var(--green-light);box-shadow:0 0 0 2px var(--green-light)}
+.gs-outil.cher{opacity:.5}
+.gs-outil-nom{font-size:.66rem;font-weight:700;line-height:1.15;text-align:center}
+.gs-cout{font-size:.66rem;color:#8a6520;font-weight:700}
+.gs-aide{font-size:.84rem;line-height:1.5;color:var(--text);background:var(--bg);border-radius:var(--radius-sm);padding:8px 10px}
+.gs-info-ligne{margin-top:8px;font-size:.86rem}
+.gs-info-alerte{margin-top:8px;font-size:.82rem;background:var(--amber-light);border-left:3px solid var(--amber);padding:7px 10px;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.gs-prix{background:var(--bg);border-radius:20px;padding:3px 10px;font-size:.82rem;font-weight:700}
+.gs-dessins-titre{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:20px 0 8px}
+.gs-dessins{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.gs-dessin{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.gs-dessin.fait{border-color:var(--green);background:var(--green-light)}
+.gs-dessin-vis{width:72px;height:72px;display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(#f3f3f3 0 25%,#fff 0 50%) 0 0/14px 14px;border-radius:var(--radius-sm)}
+.gs-dessin-nom{font-weight:700;font-size:.85rem;color:var(--green-dark)}
+.gs-dessin-btns{display:flex;gap:4px;margin-top:4px}
 /* ── Animaux ── */
 .anim-pet-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:border-color .2s,transform .2s}
 .anim-pet-card:hover{border-color:var(--green);transform:translateY(-2px)}
@@ -1038,8 +1062,13 @@ function renderMargotSpace() {
     content = renderJeuxMenu();
 
   } else if (_margotTab === 'gestion') {
-    title = 'Jeu de gestion'; back = '#margot/jeux';
-    content = renderJeuGestion();
+    if (_margotId === 'dessins') {
+      title = 'Mes dessins'; back = '#margot/gestion'; showNav = false;
+      content = renderGsDessins();
+    } else {
+      title = 'Ma petite usine'; back = '#margot/jeux';
+      content = renderJeuGestion();
+    }
 
   } else if (_margotTab === 'histoires') {
     const h = (_margotId && _margotId !== 'nouvelle') ? mgHistoire(_margotId) : null;
@@ -1092,6 +1121,7 @@ function renderMargotSpace() {
     </div>
     <div style="padding:16px;max-width:800px;margin:0 auto;padding-bottom:${showNav?'90px':'30px'}">${content}</div>
     ${nav}`;
+  if (_margotTab === 'gestion' && !_margotId) gsDemarrer();
 }
 
 // ── Accueil de l'espace ──
@@ -1146,13 +1176,17 @@ function renderMargotHome() {
 const MG_JEUX_SECTIONS = [
   {id:'decision', icon:'🎮', titre:'Jeux de décision',
    desc:"Des histoires dont on est le personnage, où chaque rencontre demande une décision."},
-  {id:'gestion',  icon:'🏗️', titre:'Jeu de gestion',
-   desc:"À construire."},
+  {id:'gestion',  icon:'🏭', titre:'Ma petite usine',
+   desc:"Récolter, faire pousser, tracer des tapis roulants et transformer les ressources dans des ateliers — avec tes dessins."},
 ];
 
 function renderJeuxMenu() {
   const stat = id => {
-    if (id !== 'decision') return 'Page vide pour l\'instant';
+    if (id === 'gestion') {
+      const p = gsData().partie, nd = Object.keys(gsData().dessins).length;
+      const txt = p ? `🪙 ${p.pieces} · objectif ${Math.min(p.obj + 1, GS_OBJECTIFS.length)}/${GS_OBJECTIFS.length}` : 'Nouvelle usine à construire';
+      return txt + (nd ? ` · ${nd} dessin${nd > 1 ? 's' : ''}` : '');
+    }
     const n = mgJeux().length;
     const sc = mgJeux().reduce((s,j)=>s+mgScenes(j).length,0);
     return n ? `${n} jeu${n>1?'x':''} · ${sc} rencontre${sc>1?'s':''}` : 'Rien pour le moment';
@@ -1171,13 +1205,792 @@ function renderJeuxMenu() {
       </div>`).join('')}`;
 }
 
+// ═══════════════════════════════════════════════════════
+// MARGOT — JEU DE GESTION : MA PETITE USINE
+// ═══════════════════════════════════════════════════════
+const GS_W = 10, GS_H = 10;
+const GS_DX = [1,0,-1,0], GS_DY = [0,1,0,-1];
+const GS_FLECHE = ['→','↓','←','↑'];
+const GS_VITESSE_TAPIS = 1.6;   // tuiles par seconde
+const GS_STOCK_SORTIE = 3;      // objets qu'un bâtiment garde avant de s'arrêter
+const GS_DESSIN_PX = 128;       // taille des dessins enregistrés
+const GS_EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+
+const GS_TERRAINS = {
+  h:{nom:'Prairie',  couleur:'#A3C77F'},
+  f:{nom:'Forêt',    couleur:'#5F8F4C', emoji:'🌳'},
+  p:{nom:'Rochers',  couleur:'#B0A99F', emoji:'🪨'},
+  c:{nom:'Cristaux', couleur:'#A99BD3', emoji:'💎'},
+  e:{nom:'Étang',    couleur:'#72B5DC', emoji:'🌊'},
+};
+
+const GS_RES = {
+  ble:    {nom:'Blé',     emoji:'🌾', prix:1},
+  bois:   {nom:'Bois',    emoji:'🪵', prix:1},
+  pierre: {nom:'Pierre',  emoji:'🪨', prix:1},
+  eau:    {nom:'Eau',     emoji:'💧', prix:1},
+  cristal:{nom:'Cristal', emoji:'💎', prix:3},
+  farine: {nom:'Farine',  emoji:'🥣', prix:4},
+  planche:{nom:'Planche', emoji:'🪜', prix:3},
+  brique: {nom:'Brique',  emoji:'🧱', prix:5},
+  pain:   {nom:'Pain',    emoji:'🍞', prix:12},
+  meuble: {nom:'Meuble',  emoji:'🪑', prix:10},
+  bijou:  {nom:'Bijou',   emoji:'💍', prix:25},
+};
+
+const GS_BAT = {
+  tapis:      {nom:'Tapis roulant', emoji:'➡️', cout:2,  type:'tapis',
+               desc:"Transporte les objets. Glisse le doigt pour tracer un chemin, touche un tapis pour le tourner."},
+  champ:      {nom:'Champ',      emoji:'🌱', cout:10, sol:'h', type:'source', produit:'ble',     duree:6},
+  bucheron:   {nom:'Bûcheron',   emoji:'🪓', cout:15, sol:'f', type:'source', produit:'bois',    duree:4},
+  carriere:   {nom:'Carrière',   emoji:'⛏️', cout:15, sol:'p', type:'source', produit:'pierre',  duree:4},
+  pompe:      {nom:'Pompe',      emoji:'🚰', cout:15, sol:'e', type:'source', produit:'eau',     duree:3},
+  mine:       {nom:'Mine',       emoji:'🔮', cout:40, sol:'c', type:'source', produit:'cristal', duree:8},
+  moulin:     {nom:'Moulin',      emoji:'🌬️', cout:30, sol:'h', type:'usine', entree:{ble:2},             sortie:'farine',  duree:4},
+  scierie:    {nom:'Scierie',     emoji:'🪚', cout:25, sol:'h', type:'usine', entree:{bois:1},            sortie:'planche', duree:3},
+  briqueterie:{nom:'Briqueterie', emoji:'🔥', cout:35, sol:'h', type:'usine', entree:{pierre:1, eau:1},   sortie:'brique',  duree:4},
+  boulangerie:{nom:'Boulangerie', emoji:'🥖', cout:50, sol:'h', type:'usine', entree:{farine:1, eau:1},   sortie:'pain',    duree:5},
+  menuiserie: {nom:'Menuiserie',  emoji:'🔨', cout:45, sol:'h', type:'usine', entree:{planche:2},         sortie:'meuble',  duree:5},
+  joaillerie: {nom:'Joaillerie',  emoji:'✨', cout:80, sol:'h', type:'usine', entree:{cristal:1, pierre:1}, sortie:'bijou', duree:6},
+  marche:     {nom:'Marché',      emoji:'🏪', cout:20, sol:'h', type:'marche',
+               desc:"Vend tout ce qui arrive dessus et rapporte des pièces."},
+};
+
+const GS_OBJECTIFS = [
+  {res:'ble',     n:5, gain:20,  texte:"Pose un champ, relie-le au marché avec des tapis roulants et vends 5 blés."},
+  {res:'bois',    n:5, gain:25,  texte:"Installe un bûcheron dans la forêt et vends 5 bois."},
+  {res:'farine',  n:3, gain:40,  texte:"Un moulin transforme 2 blés en farine. Vends 3 farines."},
+  {res:'planche', n:4, gain:40,  texte:"Une scierie coupe le bois en planches. Vends 4 planches."},
+  {res:'brique',  n:3, gain:60,  texte:"La briqueterie a besoin de pierre et d'eau. Vends 3 briques."},
+  {res:'pain',    n:3, gain:80,  texte:"La boulangerie cuit la farine avec de l'eau. Vends 3 pains."},
+  {res:'meuble',  n:2, gain:80,  texte:"La menuiserie assemble 2 planches en meuble. Vends 2 meubles."},
+  {res:'bijou',   n:1, gain:150, texte:"La joaillerie sertit un cristal sur une pierre. Vends ton premier bijou !"},
+  {gagne:2000,    gain:0,        texte:"Fais grandir ton usine : gagne 2000 pièces au total."},
+];
+
+const GS_OUTILS = ['voir','tapis','champ','bucheron','carriere','pompe','mine',
+  'moulin','scierie','briqueterie','boulangerie','menuiserie','joaillerie','marche','demolir'];
+
+let _gs = null;                 // partie en cours, en mémoire
+let _gsOutil = 'voir', _gsDir = 0, _gsSel = null, _gsVitesse = 1;
+let _gsDirty = false, _gsLastSave = 0, _gsRaf = null, _gsLast = 0, _gsTick = 0;
+let _gsT = 0, _gsHudT = 0, _gsFloats = [], _gsDrag = null, _gsFond = true;
+const _gsImgCache = {};
+
+function gsData() {
+  if (!state.margot) state.margot = {};
+  if (!state.margot.gestion) state.margot.gestion = {};
+  const g = state.margot.gestion;
+  if (!g.dessins) g.dessins = {};
+  return g;
+}
+
+function gsPartie() {
+  if (!_gs) {
+    const p = gsData().partie;
+    _gs = p && p.terrain ? JSON.parse(JSON.stringify(p)) : gsNouvellePartie(Date.now() % 100000);
+  }
+  return _gs;
+}
+
+function gsRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function gsGenTerrain(seed) {
+  const r = gsRng(seed);
+  const g = Array.from({length:GS_H}, () => Array(GS_W).fill('h'));
+  const tache = (type, rayon) => {
+    for (let essai = 0; essai < 40; essai++) {
+      const cx = Math.floor(r()*GS_W), cy = Math.floor(r()*GS_H);
+      if (Math.abs(cx-5) < 3 && Math.abs(cy-5) < 3) continue;   // le centre reste libre
+      for (let y = 0; y < GS_H; y++) for (let x = 0; x < GS_W; x++) {
+        if (g[y][x] === 'h' && Math.hypot(x-cx, y-cy) <= rayon + r()*0.8 - 0.3) g[y][x] = type;
+      }
+      return;
+    }
+  };
+  tache('f', 1.8); tache('f', 1.3); tache('p', 1.4); tache('p', 0.9); tache('e', 1.4); tache('c', 1);
+  return g.map(l => l.join(''));
+}
+
+function gsNouvellePartie(seed) {
+  let terrain;
+  for (;; seed++) {
+    terrain = gsGenTerrain(seed);
+    const tout = terrain.join('');
+    if ('fpce'.split('').every(t => tout.includes(t))) break;
+  }
+  return {v:1, graine:seed, terrain, bat:{'5,5':{t:'marche'}}, pieces:60, gagne:0, vendus:{}, obj:0};
+}
+
+function gsSauver() {
+  if (!_gs) return;
+  gsData().partie = JSON.parse(JSON.stringify(_gs));
+  _gsDirty = false;
+  _gsLastSave = performance.now();
+  save();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && _gs && _gsDirty) gsSauver();
+});
+
+// ── Simulation ──
+function gsBat(x, y) {
+  if (x < 0 || y < 0 || x >= GS_W || y >= GS_H) return null;
+  return _gs.bat[x+','+y] || null;
+}
+
+function gsAccepte(b, res) {
+  const def = GS_BAT[b.t];
+  if (def.type === 'marche') return true;
+  if (def.type === 'usine') {
+    const besoin = def.entree[res];
+    return !!besoin && ((b.buf && b.buf[res]) || 0) < besoin * 2;
+  }
+  return false;
+}
+
+function gsDonner(b, res, x, y) {
+  if (GS_BAT[b.t].type === 'marche') { gsVendre(res, x, y); return; }
+  if (!b.buf) b.buf = {};
+  b.buf[res] = (b.buf[res] || 0) + 1;
+}
+
+function gsVendre(res, x, y) {
+  const prix = GS_RES[res].prix;
+  _gs.pieces += prix;
+  _gs.gagne += prix;
+  _gs.vendus[res] = (_gs.vendus[res] || 0) + 1;
+  _gsFloats.push({x, y, txt:'+' + prix, t:0});
+  _gsDirty = true;
+  gsVerifObjectif();
+}
+
+function gsObjectifFait(o) {
+  return o.gagne ? _gs.gagne >= o.gagne : (_gs.vendus[o.res] || 0) >= o.n;
+}
+
+function gsVerifObjectif() {
+  const o = GS_OBJECTIFS[_gs.obj];
+  if (!o || !gsObjectifFait(o)) return;
+  _gs.pieces += o.gain;
+  _gs.obj++;
+  showToast('🎉 Objectif réussi !' + (o.gain ? ' +' + o.gain + ' pièces' : ''));
+  gsMajHud(true);
+}
+
+// Un bâtiment pose ses objets sur un tapis voisin, ou directement dans un bâtiment voisin qui en veut.
+function gsSortir(b, x, y, tick) {
+  for (let i = 0; i < 4 && b.out.length; i++) {
+    const d = ((b.rr || 0) + i) % 4;
+    const nx = x + GS_DX[d], ny = y + GS_DY[d], c = gsBat(nx, ny);
+    if (!c) continue;
+    const res = b.out[0];
+    if (GS_BAT[c.t].type === 'tapis') {
+      if (c.it || c.d === (d + 2) % 4) continue;   // tapis occupé, ou qui revient vers le bâtiment
+      c.it = res; c.ip = 0; c.tk = tick;
+    } else if (gsAccepte(c, res)) {
+      gsDonner(c, res, nx, ny);
+    } else continue;
+    b.out.shift();
+    b.rr = (d + 1) % 4;
+  }
+}
+
+function gsPas(dt) {
+  const tick = ++_gsTick;
+  for (const k in _gs.bat) {
+    const b = _gs.bat[k], def = GS_BAT[b.t];
+    if (!def) continue;
+    const i = k.indexOf(','), x = +k.slice(0, i), y = +k.slice(i + 1);
+
+    if (def.type === 'source') {
+      if (!b.out) b.out = [];
+      if (b.out.length < GS_STOCK_SORTIE) {
+        b.p = (b.p || 0) + dt;
+        if (b.p >= def.duree) { b.p = 0; b.out.push(def.produit); }
+      }
+    } else if (def.type === 'usine') {
+      if (!b.out) b.out = [];
+      if (!b.buf) b.buf = {};
+      if (!b.fab && Object.entries(def.entree).every(([r, n]) => (b.buf[r] || 0) >= n)) {
+        for (const [r, n] of Object.entries(def.entree)) b.buf[r] -= n;
+        b.fab = true; b.p = 0;
+      }
+      if (b.fab && b.out.length < GS_STOCK_SORTIE) {
+        b.p = (b.p || 0) + dt;
+        if (b.p >= def.duree) { b.fab = false; b.p = 0; b.out.push(def.sortie); }
+      }
+    } else if (def.type === 'tapis' && b.it && b.tk !== tick) {
+      b.ip = (b.ip || 0) + dt * GS_VITESSE_TAPIS;
+      if (b.ip >= 1) {
+        const nx = x + GS_DX[b.d], ny = y + GS_DY[b.d], c = gsBat(nx, ny);
+        if (c && GS_BAT[c.t].type === 'tapis') {
+          if (!c.it && c.d !== (b.d + 2) % 4) {
+            c.it = b.it; c.ip = Math.min(b.ip - 1, 0.5); c.tk = tick;
+            delete b.it; b.ip = 0;
+          } else b.ip = 1;
+        } else if (c && gsAccepte(c, b.it)) {
+          gsDonner(c, b.it, nx, ny);
+          delete b.it; b.ip = 0;
+        } else b.ip = 1;
+      }
+    }
+
+    if (b.out && b.out.length) gsSortir(b, x, y, tick);
+  }
+}
+
+// ── Construction ──
+function gsPeutPoser(t, x, y) {
+  const def = GS_BAT[t], sol = _gs.terrain[y][x];
+  if (gsBat(x, y)) return 'Il y a déjà quelque chose ici.';
+  if (t === 'tapis' ? sol === 'e' : sol !== def.sol)
+    return t === 'tapis' ? 'Pas de tapis sur l\'eau.' : `${def.nom} : se pose sur ${GS_TERRAINS[def.sol].nom.toLowerCase()}.`;
+  if (_gs.pieces < def.cout) return `Il te manque ${def.cout - _gs.pieces} pièce${def.cout - _gs.pieces > 1 ? 's' : ''}.`;
+  return '';
+}
+
+function gsPoser(t, x, y, d) {
+  const err = gsPeutPoser(t, x, y);
+  if (err) return err;
+  _gs.pieces -= GS_BAT[t].cout;
+  const b = {t};
+  if (t === 'tapis') b.d = d;
+  _gs.bat[x+','+y] = b;
+  _gsDirty = true;
+  return '';
+}
+
+function gsDemolir(x, y) {
+  const b = gsBat(x, y);
+  if (!b) return;
+  if (b.t === 'marche' && Object.values(_gs.bat).filter(c => c.t === 'marche').length === 1) {
+    showToast('Garde au moins un marché pour vendre.');
+    return;
+  }
+  _gs.pieces += Math.floor(GS_BAT[b.t].cout / 2);
+  delete _gs.bat[x+','+y];
+  _gsDirty = true;
+  gsMajHud(true);
+}
+
+function gsTourner(x, y) {
+  const b = gsBat(x, y);
+  if (!b || b.t !== 'tapis') return;
+  b.d = (b.d + 1) % 4;
+  _gsDirty = true;
+  gsMajInfo();
+}
+
+// ── Doigt / souris sur la carte ──
+function gsTuile(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  return {x: Math.floor((e.clientX - r.left) / (r.width / GS_W)),
+          y: Math.floor((e.clientY - r.top) / (r.height / GS_H))};
+}
+function gsDansCarte(t) { return t.x >= 0 && t.y >= 0 && t.x < GS_W && t.y < GS_H; }
+
+function gsDown(e) {
+  const t = gsTuile(e);
+  if (!gsDansCarte(t)) return;
+  e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId);
+  _gsDrag = {x:t.x, y:t.y, moved:false, existait:!!gsBat(t.x, t.y)};
+  if (_gsOutil === 'voir') { _gsSel = t; gsMajInfo(); return; }
+  if (_gsOutil === 'demolir') { gsDemolir(t.x, t.y); return; }
+  if (_gsOutil === 'tapis') {
+    if (!gsBat(t.x, t.y)) { const err = gsPoser('tapis', t.x, t.y, _gsDir); if (err) showToast(err); }
+  } else {
+    const err = gsPoser(_gsOutil, t.x, t.y);
+    if (err) showToast(err);
+  }
+  gsMajHud(true);
+}
+
+function gsMove(e) {
+  if (!_gsDrag || _gsOutil === 'voir') return;
+  const t = gsTuile(e);
+  if (!gsDansCarte(t)) return;
+  // On avance case par case pour ne pas sauter de tuile si le doigt va vite.
+  while (t.x !== _gsDrag.x || t.y !== _gsDrag.y) {
+    const dx = t.x - _gsDrag.x, dy = t.y - _gsDrag.y;
+    const d = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
+    const nx = _gsDrag.x + GS_DX[d], ny = _gsDrag.y + GS_DY[d];
+    if (_gsOutil === 'tapis') {
+      const prec = gsBat(_gsDrag.x, _gsDrag.y);
+      if (prec && prec.t === 'tapis') { prec.d = d; _gsDirty = true; }
+      if (!gsBat(nx, ny)) gsPoser('tapis', nx, ny, d);
+      _gsDir = d;
+    } else if (_gsOutil === 'demolir') {
+      gsDemolir(nx, ny);
+    }
+    _gsDrag.x = nx; _gsDrag.y = ny; _gsDrag.moved = true;
+  }
+  gsMajHud(true);
+}
+
+function gsUp() {
+  if (_gsDrag && !_gsDrag.moved && _gsOutil === 'tapis' && _gsDrag.existait) gsTourner(_gsDrag.x, _gsDrag.y);
+  _gsDrag = null;
+  if (_gsOutil === 'tapis') gsMajOutils();
+}
+
+// ── Dessin de la carte ──
+function gsImg(key) {
+  const url = gsData().dessins[key];
+  if (!url) return null;
+  let im = _gsImgCache[key];
+  if (!im || im._url !== url) { im = new Image(); im._url = url; im.src = url; _gsImgCache[key] = im; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+
+function gsEmoji(ctx, em, cx, cy, taille, alpha) {
+  ctx.save();
+  if (alpha != null) ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#000';   // la transparence du remplissage déteindrait sur l'emoji
+  ctx.font = `${Math.round(taille)}px ${GS_EMOJI_FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(em, cx, cy + taille * 0.06);
+  ctx.restore();
+}
+
+function gsDessinerRes(ctx, res, cx, cy, taille) {
+  const im = gsImg('res:' + res);
+  if (im) ctx.drawImage(im, cx - taille/2, cy - taille/2, taille, taille);
+  else gsEmoji(ctx, GS_RES[res].emoji, cx, cy, taille * 0.85);
+}
+
+function gsArrondi(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function gsDessinerTapis(ctx, b, x, y, T) {
+  ctx.save();
+  ctx.translate(x*T + T/2, y*T + T/2);
+  ctx.rotate(b.d * Math.PI / 2);
+  const im = gsImg('bat:tapis');
+  if (im) {
+    ctx.drawImage(im, -T/2, -T/2, T, T);
+  } else {
+    const l = T * 0.62;
+    ctx.fillStyle = '#5B5550';
+    ctx.fillRect(-T/2, -l/2, T, l);
+    ctx.fillStyle = '#3F3A36';
+    ctx.fillRect(-T/2, -l/2, T, l * 0.1); ctx.fillRect(-T/2, l/2 - l * 0.1, T, l * 0.1);
+    // chevrons qui défilent
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = Math.max(1.5, T * 0.05); ctx.lineCap = 'round';
+    const pas = T / 2, dec = (_gsT * GS_VITESSE_TAPIS * T) % pas;
+    ctx.beginPath();
+    ctx.rect(-T/2, -l/2, T, l); ctx.clip();
+    for (let cx = -T/2 - pas + dec; cx < T/2 + pas; cx += pas) {
+      ctx.beginPath();
+      ctx.moveTo(cx - T*0.08, -l*0.25); ctx.lineTo(cx + T*0.06, 0); ctx.lineTo(cx - T*0.08, l*0.25);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function gsDessinerBatiment(ctx, b, x, y, T) {
+  const def = GS_BAT[b.t];
+  const im = gsImg('bat:' + b.t);
+  if (im) {
+    ctx.drawImage(im, x*T + T*0.04, y*T + T*0.04, T*0.92, T*0.92);
+  } else {
+    const m = T * 0.08;
+    gsArrondi(ctx, x*T + m, y*T + m, T - 2*m, T - 2*m, T * 0.16);
+    ctx.fillStyle = def.type === 'marche' ? '#FDF0D5' : def.type === 'usine' ? '#FFF7EC' : 'rgba(255,255,255,.75)';
+    ctx.fill();
+    ctx.strokeStyle = def.type === 'usine' ? '#C99A4A' : def.type === 'marche' ? '#D9A441' : 'rgba(46,84,56,.45)';
+    ctx.lineWidth = Math.max(1, T * 0.035);
+    ctx.stroke();
+    gsEmoji(ctx, def.emoji, x*T + T/2, y*T + T*0.47, T * 0.5);
+  }
+  // barre d'avancement
+  const enCours = def.type === 'source' || (def.type === 'usine' && b.fab);
+  if (enCours) {
+    const f = Math.min(1, (b.p || 0) / def.duree);
+    const bx = x*T + T*0.16, by = y*T + T*0.84, bw = T*0.68, bh = Math.max(3, T*0.07);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = b.out && b.out.length >= GS_STOCK_SORTIE ? '#E8B86D' : '#4A7C59';
+    ctx.fillRect(bx, by, bw * f, bh);
+  }
+  // objets en attente de sortie
+  if (b.out && b.out.length) {
+    const r = T * 0.15, cx = x*T + T - r - T*0.04, cy = y*T + r + T*0.04;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = b.out.length >= GS_STOCK_SORTIE ? '#E8B86D' : '#fff'; ctx.fill();
+    ctx.fillStyle = '#2E5438';
+    ctx.font = `bold ${Math.round(r * 1.3)}px system-ui,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(b.out.length, cx, cy + 1);
+  }
+}
+
+function gsDessiner(cv) {
+  const ctx = cv.getContext('2d');
+  const T = cv.width / GS_W;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  for (let y = 0; y < GS_H; y++) for (let x = 0; x < GS_W; x++) {
+    const s = _gs.terrain[y][x], def = GS_TERRAINS[s];
+    ctx.fillStyle = def.couleur;
+    ctx.fillRect(x*T, y*T, T + 1, T + 1);
+    if ((x + y) % 2) { ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(x*T, y*T, T, T); }
+    const im = gsImg('ter:' + s);
+    if (im) ctx.drawImage(im, x*T, y*T, T, T);
+    else if (def.emoji && !gsBat(x, y)) gsEmoji(ctx, def.emoji, x*T + T/2, y*T + T/2, T * 0.5, 0.8);
+  }
+
+  const tapis = [];
+  for (const k in _gs.bat) {
+    const b = _gs.bat[k];
+    if (!GS_BAT[b.t]) continue;
+    const i = k.indexOf(','), x = +k.slice(0, i), y = +k.slice(i + 1);
+    if (b.t === 'tapis') { gsDessinerTapis(ctx, b, x, y, T); tapis.push([b, x, y]); }
+    else gsDessinerBatiment(ctx, b, x, y, T);
+  }
+  // les objets passent au-dessus des tapis
+  for (const [b, x, y] of tapis) {
+    if (!b.it) continue;
+    const a = Math.min(1, b.ip || 0) - 0.5;
+    gsDessinerRes(ctx, b.it, x*T + T/2 + GS_DX[b.d]*a*T, y*T + T/2 + GS_DY[b.d]*a*T, T * 0.48);
+  }
+
+  if (_gsSel && _gsOutil === 'voir') {
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, T * 0.06);
+    gsArrondi(ctx, _gsSel.x*T + 2, _gsSel.y*T + 2, T - 4, T - 4, T * 0.14);
+    ctx.stroke();
+  }
+
+  for (const f of _gsFloats) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - f.t);
+    ctx.font = `bold ${Math.round(T * 0.32)}px system-ui,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(2, T * 0.06); ctx.strokeStyle = '#2E5438';
+    const px = f.x*T + T/2, py = f.y*T + T*0.3 - f.t * T * 0.6;
+    ctx.strokeText('🪙' + f.txt, px, py);
+    ctx.fillStyle = '#FFE08A'; ctx.fillText('🪙' + f.txt, px, py);
+    ctx.restore();
+  }
+}
+
+function gsAjusterTaille(cv) {
+  const css = cv.clientWidth, dpr = window.devicePixelRatio || 1;
+  const w = Math.round(css * dpr), h = Math.round(css * GS_H / GS_W * dpr);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+}
+
+function gsBoucle(ts) {
+  const cv = document.getElementById('gs-canvas');
+  if (!cv) { _gsRaf = null; if (_gsDirty) gsSauver(); return; }
+  const dt = Math.min(0.25, Math.max(0, (ts - (_gsLast || ts)) / 1000));
+  _gsLast = ts; _gsT += dt;
+  let reste = dt * _gsVitesse;
+  while (reste > 0) { const h = Math.min(reste, 0.05); gsPas(h); reste -= h; }
+  for (const f of _gsFloats) f.t += dt * 1.2;
+  _gsFloats = _gsFloats.filter(f => f.t < 1);
+  gsAjusterTaille(cv);
+  gsDessiner(cv);
+  gsMajHud();
+  if (_gsDirty && ts - _gsLastSave > 20000) gsSauver();
+  _gsRaf = requestAnimationFrame(gsBoucle);
+}
+
+function gsDemarrer() {
+  gsPartie();
+  gsMajHud(true);
+  gsMajInfo();
+  if (!_gsRaf) { _gsLast = 0; _gsRaf = requestAnimationFrame(gsBoucle); }
+}
+
+// ── Interface autour de la carte ──
+function gsVisuel(key, emoji, taille) {
+  const url = gsData().dessins[key];
+  return url
+    ? `<img src="${url}" alt="" style="width:${taille}px;height:${taille}px;object-fit:contain;vertical-align:middle">`
+    : `<span style="font-size:${Math.round(taille*0.8)}px;line-height:1;vertical-align:middle">${emoji}</span>`;
+}
+function gsVisuelRes(res, t) { return gsVisuel('res:' + res, GS_RES[res].emoji, t || 22); }
+function gsVisuelBat(bat, t) { return gsVisuel('bat:' + bat, GS_BAT[bat].emoji, t || 26); }
+
+function gsRecetteHtml(def, t) {
+  if (def.type === 'source') return `→ ${gsVisuelRes(def.produit, t)}`;
+  if (def.type !== 'usine') return '';
+  const ent = Object.entries(def.entree).map(([r, n]) => Array(n).fill(gsVisuelRes(r, t)).join('')).join(' + ');
+  return `${ent} → ${gsVisuelRes(def.sortie, t)}`;
+}
+
+function gsDescOutil(o) {
+  if (o === 'voir') return "👆 Touche une case pour voir ce qui s'y passe.";
+  if (o === 'demolir') return "🧹 Touche ou glisse sur un bâtiment pour l'enlever (tu récupères la moitié du prix).";
+  const def = GS_BAT[o];
+  let txt = `<b>${def.nom}</b> · 🪙 ${def.cout}`;
+  if (def.sol) txt += ` · sur ${GS_TERRAINS[def.sol].nom.toLowerCase()}`;
+  if (def.type === 'source') txt += ` · produit ${gsVisuelRes(def.produit, 18)} toutes les ${def.duree} s`;
+  if (def.type === 'usine') txt += ` · ${gsRecetteHtml(def, 18)} en ${def.duree} s`;
+  if (def.desc) txt += `<br>${def.desc}`;
+  if (o === 'tapis') txt += ` <button class="btn btn-outline btn-sm" style="margin-left:4px" onclick="gsChangerSens()">Sens ${GS_FLECHE[_gsDir]}</button>`;
+  return txt;
+}
+
+function gsOutilsHtml() {
+  return GS_OUTILS.map(o => {
+    let vis, cout = '';
+    if (o === 'voir') vis = '<span style="font-size:22px">👆</span>';
+    else if (o === 'demolir') vis = '<span style="font-size:22px">🧹</span>';
+    else { vis = gsVisuelBat(o, 28); cout = `<span class="gs-cout">🪙${GS_BAT[o].cout}</span>`; }
+    const nom = o === 'voir' ? 'Regarder' : o === 'demolir' ? 'Enlever' : GS_BAT[o].nom;
+    const cher = GS_BAT[o] && _gs && _gs.pieces < GS_BAT[o].cout ? ' cher' : '';
+    return `<button class="gs-outil${o === _gsOutil ? ' actif' : ''}${cher}" data-outil="${o}" onclick="gsChoisirOutil('${o}')">
+      ${vis}<span class="gs-outil-nom">${nom}</span>${cout}</button>`;
+  }).join('');
+}
+
+function gsMajOutils() {
+  const el = document.getElementById('gs-outils');
+  if (el) { const sx = el.scrollLeft; el.innerHTML = gsOutilsHtml(); el.scrollLeft = sx; }
+  const aide = document.getElementById('gs-aide');
+  if (aide) aide.innerHTML = gsDescOutil(_gsOutil);
+  const cv = document.getElementById('gs-canvas');
+  if (cv) cv.style.touchAction = _gsOutil === 'voir' ? 'manipulation' : 'none';
+}
+
+function gsChoisirOutil(o) {
+  _gsOutil = o;
+  if (o !== 'voir') { _gsSel = null; gsMajInfo(); }
+  gsMajOutils();
+}
+
+function gsChangerSens() { _gsDir = (_gsDir + 1) % 4; gsMajOutils(); }
+
+function gsChangerVitesse() {
+  _gsVitesse = _gsVitesse === 1 ? 2 : _gsVitesse === 2 ? 4 : 1;
+  const el = document.getElementById('gs-vit');
+  if (el) el.textContent = '⏩ x' + _gsVitesse;
+}
+
+function gsMajHud(force) {
+  const now = performance.now();
+  if (!force && now - _gsHudT < 300) return;
+  _gsHudT = now;
+  const p = document.getElementById('gs-pieces');
+  if (!p) return;
+  p.textContent = _gs.pieces;
+  document.querySelectorAll('.gs-outil[data-outil]').forEach(btn => {
+    const def = GS_BAT[btn.dataset.outil];
+    btn.classList.toggle('cher', !!def && _gs.pieces < def.cout);
+  });
+  const o = GS_OBJECTIFS[_gs.obj];
+  const obj = document.getElementById('gs-obj');
+  const html = o
+    ? `<div class="gs-obj-titre">🎯 Objectif ${_gs.obj + 1} / ${GS_OBJECTIFS.length}${o.gain ? ` · récompense 🪙 ${o.gain}` : ''}</div>
+       <div>${o.texte}</div>
+       <div class="gs-obj-prog">${o.gagne
+         ? `🪙 ${Math.min(_gs.gagne, o.gagne)} / ${o.gagne}`
+         : `${gsVisuelRes(o.res, 20)} ${Math.min(_gs.vendus[o.res] || 0, o.n)} / ${o.n}`}</div>`
+    : `<div class="gs-obj-titre">🏆 Tous les objectifs sont faits !</div><div>Ton usine tourne toute seule. Continue à l'agrandir comme tu veux.</div>`;
+  if (obj && obj._html !== html) { obj.innerHTML = html; obj._html = html; }
+  if (_gsSel) gsMajInfo();
+}
+
+function gsMajInfo() {
+  const el = document.getElementById('gs-info');
+  if (!el) return;
+  if (!_gsSel) { el.innerHTML = ''; return; }
+  const {x, y} = _gsSel, b = gsBat(x, y), ter = GS_TERRAINS[_gs.terrain[y][x]];
+  let html;
+  if (!b) {
+    const ici = Object.entries(GS_BAT).filter(([, d]) => d.sol === _gs.terrain[y][x]).map(([k]) => GS_BAT[k].nom);
+    html = `<div class="mg-card-title">${ter.nom}</div>
+      <div class="mg-muted" style="margin-top:4px">${ici.length ? 'On peut construire ici : ' + ici.join(', ') + '.' : 'Rien ne se construit ici, mais un tapis peut passer.'}</div>`;
+  } else {
+    const def = GS_BAT[b.t];
+    html = `<div style="display:flex;gap:10px;align-items:center">${gsVisuelBat(b.t, 34)}
+      <div style="flex:1"><div class="mg-card-title">${def.nom}</div><div class="mg-muted">${ter.nom}</div></div>
+      ${b.t === 'tapis' ? `<button class="btn btn-outline btn-sm" onclick="gsTourner(${x},${y})">↻ ${GS_FLECHE[b.d]}</button>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="gsDemolir(${x},${y});gsMajInfo()">Enlever</button></div>`;
+    if (def.type === 'source') {
+      const plein = (b.out || []).length >= GS_STOCK_SORTIE;
+      html += `<div class="gs-info-ligne">Produit ${gsVisuelRes(def.produit)} toutes les ${def.duree} s — ${Math.floor(100 * (b.p || 0) / def.duree)} %</div>`;
+      if (plein) html += `<div class="gs-info-alerte">Stock plein : relie-le à un tapis qui part, ou à un bâtiment qui en a besoin.</div>`;
+    } else if (def.type === 'usine') {
+      const stock = Object.keys(def.entree).map(r => `${gsVisuelRes(r)} ${(b.buf && b.buf[r]) || 0}/${def.entree[r]}`).join(' · ');
+      html += `<div class="gs-info-ligne">Recette : ${gsRecetteHtml(def)} en ${def.duree} s</div>
+        <div class="gs-info-ligne">Dans l'atelier : ${stock}${b.fab ? ` — fabrication ${Math.floor(100 * (b.p || 0) / def.duree)} %` : ''}</div>`;
+      if ((b.out || []).length >= GS_STOCK_SORTIE) html += `<div class="gs-info-alerte">Stock plein : il faut un tapis qui emmène ${GS_RES[def.sortie].nom.toLowerCase()} ailleurs.</div>`;
+    } else if (def.type === 'tapis') {
+      html += `<div class="gs-info-ligne">Va vers ${GS_FLECHE[b.d]}${b.it ? ' · transporte ' + gsVisuelRes(b.it) : ' · vide'}</div>`;
+    } else if (def.type === 'marche') {
+      const v = Object.entries(_gs.vendus);
+      html += `<div class="gs-info-ligne">${v.length ? 'Déjà vendu : ' + v.map(([r, n]) => `${gsVisuelRes(r)} ${n}`).join(' · ') : 'Rien vendu pour le moment.'}</div>
+        <div class="gs-info-ligne">Total gagné : 🪙 ${_gs.gagne}</div>`;
+    }
+  }
+  if (el._html !== html) { el.innerHTML = `<div class="mg-card" style="margin-top:12px">${html}</div>`; el._html = html; }
+}
+
+function gsNouvelle() {
+  if (!confirm('Recommencer une nouvelle usine ? La carte et les bâtiments actuels seront effacés (tes dessins sont gardés).')) return;
+  _gs = gsNouvellePartie(Math.floor(Math.random() * 100000));
+  _gsSel = null; _gsFloats = [];
+  gsSauver();
+  renderMargotSpace();
+}
+
 function renderJeuGestion() {
+  gsPartie();
+  const recettes = Object.entries(GS_BAT).filter(([, d]) => d.type === 'source' || d.type === 'usine')
+    .map(([k, d]) => `<div class="mg-guide-pair">${gsVisuelBat(k, 28)}<b style="min-width:92px">${d.nom}</b><span>${gsRecetteHtml(d)}</span></div>`).join('');
+  const prix = Object.entries(GS_RES).map(([k, r]) => `<span class="gs-prix">${gsVisuelRes(k, 20)} ${r.prix}</span>`).join('');
   return `
-    <div class="empty-state">
-      <div class="icon">🏗️</div>
-      <h3 style="color:var(--green-dark);font-size:1.05rem">Jeu de gestion</h3>
-      <p style="margin-top:8px">Cette page est vide pour l'instant.</p>
-      <p style="font-size:.85rem;margin-top:6px">Elle attend que tu décides ce qu'on y met : ce qu'on gère, ce qui monte, ce qui s'effondre.</p>
+    <div class="gs-hud">
+      <div class="gs-pieces">🪙 <b id="gs-pieces">${_gs.pieces}</b></div>
+      <div style="flex:1"></div>
+      <button class="btn btn-outline btn-sm" id="gs-vit" onclick="gsChangerVitesse()">⏩ x${_gsVitesse}</button>
+      <button class="btn btn-primary btn-sm" onclick="navigate('#margot/gestion/dessins')">🎨 Mes dessins</button>
+    </div>
+    <div class="gs-obj" id="gs-obj"></div>
+    <div class="gs-cadre">
+      <canvas id="gs-canvas" style="touch-action:${_gsOutil === 'voir' ? 'manipulation' : 'none'}"
+        onpointerdown="gsDown(event)" onpointermove="gsMove(event)" onpointerup="gsUp(event)" onpointercancel="gsUp(event)"></canvas>
+    </div>
+    <div class="gs-outils" id="gs-outils">${gsOutilsHtml()}</div>
+    <div class="gs-aide" id="gs-aide">${gsDescOutil(_gsOutil)}</div>
+    <div id="gs-info"></div>
+
+    <details class="mg-card" style="margin-top:14px">
+      <summary class="mg-card-title" style="cursor:pointer">📖 Ce que fabrique chaque bâtiment</summary>
+      <div style="margin-top:10px">${recettes}</div>
+      <div class="mg-muted" style="margin:12px 0 6px">Prix au marché :</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${prix}</div>
+    </details>
+    <details class="mg-card">
+      <summary class="mg-card-title" style="cursor:pointer">❓ Comment jouer</summary>
+      <div class="mg-guide-body" style="padding:10px 0 0">
+        <p>1. <b>Récolte</b> : pose un champ sur la prairie, un bûcheron dans la forêt, une carrière sur les rochers, une pompe dans l'étang, une mine sur les cristaux.</p>
+        <p>2. <b>Transporte</b> : choisis le tapis roulant et glisse le doigt depuis un bâtiment jusqu'à un autre. Les flèches montrent le sens. Touche un tapis pour le faire tourner.</p>
+        <p>3. <b>Transforme</b> : amène les bonnes ressources dans un atelier (moulin, scierie…). Il fabrique quelque chose de plus précieux.</p>
+        <p>4. <b>Vends</b> : tout ce qui arrive au marché 🏪 rapporte des pièces, pour construire plus grand.</p>
+        <p class="mg-muted">Deux bâtiments collés l'un à l'autre se passent les objets directement, sans tapis. Un bâtiment dont le stock est plein (pastille orange) s'arrête : il lui faut une sortie.</p>
+        <p class="mg-muted">L'usine ne tourne que quand cette page est ouverte.</p>
+      </div>
+    </details>
+    <div style="text-align:center;margin-top:8px">
+      <button class="btn btn-outline btn-sm" onclick="gsNouvelle()">🔄 Nouvelle usine</button>
+    </div>`;
+}
+
+// ── Mes dessins ──
+function gsTraiterImage(file, effacerFond) {
+  return new Promise((ok, ko) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); ko(new Error('image illisible')); };
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const s = Math.min(1, 400 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const cx = c.getContext('2d', {willReadFrequently:true});
+      cx.drawImage(img, 0, 0, w, h);
+      const d = cx.getImageData(0, 0, w, h), px = d.data;
+      // La couleur du papier : moyenne des pixels du bord de la photo.
+      let pr = 0, pg = 0, pb = 0, n = 0;
+      const bord = k => { pr += px[k]; pg += px[k+1]; pb += px[k+2]; n++; };
+      for (let i = 0; i < w; i++) { bord(i*4); bord(((h-1)*w + i)*4); }
+      for (let j = 0; j < h; j++) { bord(j*w*4); bord((j*w + w - 1)*4); }
+      pr /= n; pg /= n; pb /= n;
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const k = (j*w + i)*4;
+        const dist = Math.hypot(px[k] - pr, px[k+1] - pg, px[k+2] - pb);
+        if (effacerFond) px[k+3] = Math.round(px[k+3] * Math.max(0, Math.min(1, (dist - 28) / 40)));
+        if (dist > 45) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+      }
+      if (effacerFond) cx.putImageData(d, 0, 0);
+      if (x1 < 0) { x0 = 0; y0 = 0; x1 = w - 1; y1 = h - 1; }
+      // On recadre autour du dessin, centré dans un carré.
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1, k = GS_DESSIN_PX / (Math.max(bw, bh) * 1.06);
+      const out = document.createElement('canvas'); out.width = out.height = GS_DESSIN_PX;
+      out.getContext('2d').drawImage(c, x0, y0, bw, bh, (GS_DESSIN_PX - bw*k) / 2, (GS_DESSIN_PX - bh*k) / 2, bw*k, bh*k);
+      let res = out.toDataURL('image/webp', 0.85);
+      if (!res.startsWith('data:image/webp')) res = out.toDataURL('image/png');
+      ok(res);
+    };
+    img.src = url;
+  });
+}
+
+async function gsChargerDessin(key, input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    gsData().dessins[key] = await gsTraiterImage(file, _gsFond);
+    save();
+    showToast('🎨 Dessin ajouté !');
+    renderMargotSpace();
+  } catch (e) {
+    showToast('Impossible de lire cette image.');
+  }
+}
+
+function gsEffacerDessin(key) {
+  if (!confirm('Retirer ce dessin et revenir à l\'image de départ ?')) return;
+  delete gsData().dessins[key];
+  save();
+  renderMargotSpace();
+}
+
+function renderGsDessins() {
+  const dessins = gsData().dessins;
+  const carte = (key, emoji, nom, note) => `
+    <div class="gs-dessin${dessins[key] ? ' fait' : ''}">
+      <div class="gs-dessin-vis">${gsVisuel(key, emoji, 64)}</div>
+      <div class="gs-dessin-nom">${nom}</div>
+      ${note ? `<div class="mg-muted" style="font-size:.72rem">${note}</div>` : ''}
+      <div class="gs-dessin-btns">
+        <label class="btn btn-outline btn-sm" style="margin:0;color:var(--green)">📷 ${dessins[key] ? 'Changer' : 'Mon dessin'}
+          <input type="file" accept="image/*" style="display:none" onchange="gsChargerDessin('${key}', this)"></label>
+        ${dessins[key] ? `<button class="btn btn-danger btn-sm" title="Retirer" onclick="gsEffacerDessin('${key}')">✕</button>` : ''}
+      </div>
+    </div>`;
+  const section = (titre, items) => `<h3 class="gs-dessins-titre">${titre}</h3><div class="gs-dessins">${items.join('')}</div>`;
+  const nb = Object.keys(dessins).length;
+  const total = Object.keys(GS_RES).length + Object.keys(GS_BAT).length + Object.keys(GS_TERRAINS).length;
+  const ko = Math.round(Object.values(dessins).reduce((s, u) => s + u.length, 0) / 1024);
+  return `
+    <div class="mg-guide-cta" style="cursor:default;align-items:flex-start">
+      <div style="font-size:1.8rem">🎨</div>
+      <div>
+        <b>Mets tes dessins dans le jeu</b>
+        <div style="margin-top:4px;font-size:.86rem;line-height:1.5">Dessine sur une feuille blanche, <b>un seul dessin par photo</b>, bien éclairé. Le jeu recadre tout seul autour du dessin.
+        Feutres et crayons bien appuyés passent mieux que les traits très clairs.</div>
+      </div>
+    </div>
+    <label class="check-label" style="display:inline-flex;margin-bottom:6px">
+      <input type="checkbox" ${_gsFond ? 'checked' : ''} onchange="_gsFond=this.checked"> Effacer le blanc du papier
+    </label>
+    <div class="mg-muted" style="margin-bottom:6px">Décoche pour un dessin qui doit remplir toute la case (un sol, un fond colorié…).</div>
+    <div class="mg-badge">${nb} / ${total} dessins · ${ko} Ko</div>
+    ${ko > 500 ? `<div class="gs-info-alerte" style="margin-top:8px">Beaucoup de dessins enregistrés : au-delà d'environ 700 Ko, la sauvegarde en ligne risque de ne plus passer.</div>` : ''}
+    ${section('Ressources', Object.entries(GS_RES).map(([k, r]) => carte('res:' + k, r.emoji, r.nom)))}
+    ${section('Bâtiments', Object.entries(GS_BAT).map(([k, b]) => carte('bat:' + k, b.emoji, b.nom, k === 'tapis' ? 'dessine-le qui va vers la droite →' : '')))}
+    ${section('Terrain', Object.entries(GS_TERRAINS).map(([k, t]) => carte('ter:' + k, t.emoji || '🟩', t.nom, 'remplit toute la case')))}
+    <div style="text-align:center;margin-top:18px">
+      <button class="btn btn-primary" onclick="navigate('#margot/gestion')">🏭 Retour à l'usine</button>
     </div>`;
 }
 
